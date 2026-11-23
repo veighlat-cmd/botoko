@@ -1,0 +1,8 @@
+# BotoKo's secret key (signs logins and CSRF tokens). Never commit or share it.
+.secret_key
+__pycache__/
+# cloudflared quick-tunnel log (TUNNEL_HOWTO.txt)
+cloudflared-tunnel.log
+# Voter account lists: Voter IDs + passwords. Never commit or share them.
+accounts*.csv
+*.log

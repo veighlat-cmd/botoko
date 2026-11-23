@@ -1,0 +1,92 @@
+[
+  {
+    "check": "tunnel: admin login works, session cookie has Secure + HttpOnly",
+    "pass": true,
+    "detail": "session=.eJwlzE0KgCA...; Expires=Thu, 19 Nov 2026 03:31:49 GMT; Secure; HttpOnly; Path=/; SameSite=Lax"
+  },
+  {
+    "check": "tunnel: rate limit / lockout see the REAL visitor IP (not 127.0.0.1)",
+    "pass": true,
+    "detail": "recorded IP 180.190.6.47"
+  },
+  {
+    "check": "tunnel: create account -> Voter ID shown",
+    "pass": true,
+    "detail": "V-RYGMP5"
+  },
+  {
+    "check": "tunnel: pending account logs in -> waiting page",
+    "pass": true,
+    "detail": "https://candidate-venice-winner-profiles.trycloudflare.com/account"
+  },
+  {
+    "check": "tunnel: admin approves the account (Approve button, CSRF form)",
+    "pass": true,
+    "detail": "verified"
+  },
+  {
+    "check": "tunnel: waiting student is taken to the events page by itself",
+    "pass": true,
+    "detail": "4.2 s"
+  },
+  {
+    "check": "tunnel: vote -> receipt; the receipt's verify link uses https://<tunnel>",
+    "pass": true,
+    "detail": "code FAF23C36; https://candidate-venice-winner-profiles.trycloudflare.com/verify"
+  },
+  {
+    "check": "tunnel: receipt PNG download is a valid image",
+    "pass": true,
+    "detail": "BotoKo-receipt-TEST-Tunnel-Election-FAF23C36.png, PNG 1080x2024"
+  },
+  {
+    "check": "tunnel: receipt JPG download is a valid image",
+    "pass": true,
+    "detail": "BotoKo-receipt-TEST-Tunnel-Election-FAF23C36.jpg, JPEG 1080x2024"
+  },
+  {
+    "check": "tunnel: duplicate vote rejected, still 1 ballot",
+    "pass": true,
+    "detail": "You have already voted."
+  },
+  {
+    "check": "tunnel: open live results page shows a new vote by itself",
+    "pass": true,
+    "detail": "1 -> 2 after 0.6 s"
+  },
+  {
+    "check": "tunnel: admin dashboard loads, 'Results by event' switches without reload",
+    "pass": true,
+    "detail": "switched to event 1"
+  },
+  {
+    "check": "tunnel: 30 simultaneous votes -> 30 stored, 0 duplicates, 0 lost, every vote row stored",
+    "pass": true,
+    "detail": "logins 30/30, accepted 30/30 in 4.63 s, DB 30 ballots, 0 duplicates, 115/115 vote rows; errors: []"
+  },
+  {
+    "check": "tunnel: End voting now (with confirmation) -> closed; a later vote is rejected",
+    "pass": true,
+    "detail": "Voting is closed for this event. Your ballot was not recorded."
+  },
+  {
+    "check": "tunnel: results hidden until published, then the open page shows the winners by itself",
+    "pass": true,
+    "detail": "announced-soon page: True; winners after 1.4 s"
+  },
+  {
+    "check": "tunnel: no JavaScript errors in the browser",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "check": "local http://127.0.0.1: login works, cookie NOT Secure (plain http keeps working)",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "check": "laptop IP http://10.248.222.49: works, and a faked X-Forwarded-For is IGNORED for direct visitors",
+    "pass": true,
+    "detail": "recorded IP 10.248.222.49"
+  }
+]

@@ -1,0 +1,51 @@
+{# One row of the admin Accounts table / Registrations table. Used by admin.html when the page is drawn AND by
+   /admin/api/registrations?rows=1 (admin.js adds rows that arrive while the page is open), so a row looks
+   and works exactly the same either way. #}
+{% import "_macros.html" as ui %}
+{% macro acc_row(a) -%}
+            <tr data-status="{{ a.status }}" data-id="{{ a.id }}"
+                data-q="{{ (a.full_name ~ ' ' ~ a.voter_id ~ ' ' ~ (a.school_student_no or '') ~ ' ' ~ (a.course or '') ~ ' ' ~ (a.department or '') ~ ' ' ~ (a.year_level or '') ~ '-' ~ (a.section or ''))|lower }}">
+              <td class="st-check">{% if a.status == 'pending' %}<input type="checkbox" name="acc_id" value="{{ a.id }}" aria-label="Select {{ a.full_name }}">{% endif %}</td>
+              <td class="st-name"><b>{{ a.full_name }}</b>{% if a.email %}<span class="reg-email">{{ a.email }}</span>{% endif %}</td>
+              <td class="mono" data-label="Voter ID">{{ a.voter_id }}</td>
+              <td class="mono" data-label="Student no.">{{ a.school_student_no or '—' }}</td>
+              <td data-label="Course">{{ a.course or '—' }}</td>
+              <td data-label="Department">{{ a.department or '—' }}</td>
+              <td data-label="Yr-Sec">{% if a.year_level %}{{ a.year_level }}-{{ a.section }}{% else %}—{% endif %}</td>
+              <td class="tnum" data-label="Created">{{ a.created or '—' }}</td>
+              <td class="st-status">{% if a.status == 'verified' %}{{ ui.reg_badge('approved', 'Verified') }}{% elif a.status == 'pending' %}{{ ui.reg_badge('pending', 'Pending') }}{% else %}{{ ui.reg_badge('rejected', 'Rejected') }}{% endif %}
+                {% if a.status == 'rejected' and a.reason %}<span class="reg-reason-small">{{ a.reason }}</span>{% endif %}</td>
+              <td class="st-actions">
+                {% if a.status == 'pending' %}
+                <button class="btn btn-success btn-sm" type="submit" name="one" value="{{ a.id }}" aria-label="Approve {{ a.full_name }}">{{ ui.icon('check') }} Approve</button>
+                <button class="btn btn-danger-outline btn-sm" type="button" data-acc-reject="{{ a.id }}" data-name="{{ a.full_name }}" aria-label="Reject {{ a.full_name }}">{{ ui.icon('x') }} Reject</button>
+                {% elif a.status == 'rejected' %}
+                <button class="btn btn-ghost btn-sm" type="submit" name="one" value="{{ a.id }}" aria-label="Approve {{ a.full_name }} anyway">{{ ui.icon('check') }} Approve</button>
+                {% elif a.decided %}<span class="hint">{{ a.decided }}</span>{% endif %}
+              </td>
+            </tr>
+{%- endmacro %}
+
+{% macro reg_row(r) -%}
+            <tr data-status="{{ r.status }}" data-id="{{ r.id }}"
+                data-q="{{ (r.full_name ~ ' ' ~ r.school_student_no ~ ' ' ~ (r.course or '') ~ ' ' ~ (r.department or '') ~ ' ' ~ (r.year_level or '') ~ '-' ~ (r.section or '') ~ ' ' ~ (r.voter_id or ''))|lower }}">
+              <td class="st-check">{% if r.status == 'pending' %}<input type="checkbox" name="reg_id" value="{{ r.id }}" aria-label="Select {{ r.full_name }}">{% endif %}</td>
+              <td class="st-name"><b>{{ r.full_name }}</b>{% if r.email %}<span class="reg-email">{{ r.email }}</span>{% endif %}</td>
+              <td class="mono" data-label="Student no.">{{ r.school_student_no }}</td>
+              <td data-label="Course">{{ r.course or '—' }}</td>
+              <td data-label="Department">{{ r.department or '—' }}</td>
+              <td data-label="Yr-Sec">{% if r.year_level %}{{ r.year_level }}-{{ r.section }}{% else %}—{% endif %}</td>
+              <td class="tnum" data-label="Submitted">{{ r.submitted }}</td>
+              <td class="st-status">{{ ui.reg_badge(r.status) }}
+                {% if r.existing %}<span class="badge badge-muted" title="Already has a BotoKo account">{{ r.voter_id or 'Has account' }}</span>{% else %}<span class="badge" title="A Voter ID is created when you approve">New student</span>{% endif %}
+                {% if r.status == 'rejected' and r.reason %}<span class="reg-reason-small">{{ r.reason }}</span>{% endif %}</td>
+              <td class="st-actions">
+                {% if r.status == 'pending' %}
+                <button class="btn btn-success btn-sm" type="submit" name="one" value="{{ r.id }}" aria-label="Approve {{ r.full_name }}">{{ ui.icon('check') }} Approve</button>
+                <button class="btn btn-danger-outline btn-sm" type="button" data-reject="{{ r.id }}" data-name="{{ r.full_name }}" aria-label="Reject {{ r.full_name }}">{{ ui.icon('x') }} Reject</button>
+                {% elif r.status == 'rejected' %}
+                <button class="btn btn-ghost btn-sm" type="submit" name="one" value="{{ r.id }}" aria-label="Approve {{ r.full_name }} anyway">{{ ui.icon('check') }} Approve</button>
+                {% elif r.decided %}<span class="hint">{{ r.decided }}</span>{% endif %}
+              </td>
+            </tr>
+{%- endmacro %}

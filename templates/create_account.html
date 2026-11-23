@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Create account · BotoKo{% endblock %}
+{% block main_class %}center{% endblock %}
+{# Create account (separate from registering for an event). On success the Voter ID is shown at once. #}
+{% macro field_attrs(name) -%}
+{% if field == name %}aria-invalid="true" aria-describedby="form-error" autofocus{% endif %}
+{%- endmacro %}
+{% block content %}
+<div class="auth reg">
+  <div class="auth-brand">
+    {{ ui.logo(96) }}
+    <h1>{{ 'Account created' if created else 'Create account' }}</h1>
+    <p class="tagline">{{ 'Save your Voter ID before you leave this page.' if created else 'One account per student. You use it for every voting event.' }}</p>
+  </div>
+
+  {% if created %}
+  <section class="card account-created" aria-labelledby="done-heading">
+    <h2 id="done-heading" class="sr-only">Your new account</h2>
+    <div class="code-box voter-id-box">
+      <span class="label">Your Voter ID</span>
+      <span class="code" id="voter-id">{{ created.voter_id }}</span>
+      <button type="button" class="btn btn-primary btn-sm" data-copy="#voter-id" hidden>{{ ui.icon('copy') }}<span class="copy-label">Copy Voter ID</span></button>
+      <p class="hint save-hint">{{ ui.icon('alert') }} <b>Save your Voter ID; you'll use it to log in.</b>
+        Take a screenshot or write it down.</p>
+    </div>
+    <dl class="facts facts-compact">
+      <div class="wide"><dt>Name</dt><dd>{{ created.name }}</dd></div>
+      <div><dt>Student number</dt><dd class="mono">{{ created.school_student_no }}</dd></div>
+      <div><dt>Status</dt><dd>{{ ui.reg_badge('pending', 'Pending verification') }}</dd></div>
+    </dl>
+    <p class="muted">The election committee (COMELEC) checks your account once. After that you can register for
+      voting events and vote. You can log in now to see your status.</p>
+    <a class="btn btn-primary btn-lg btn-block" href="{{ url_for('login') }}"><span>Go to log in</span>{{ ui.icon('arrow') }}</a>
+  </section>
+
+  {% else %}
+  <section class="card" aria-labelledby="ca-heading">
+    <h2 id="ca-heading" class="sr-only">Your details</h2>
+    {% if error %}
+    <div class="alert alert-error" role="alert" id="form-error">{{ ui.icon('alert') }}
+      <p>{{ error }}{% if exists %} <a href="{{ url_for('login') }}">Log in</a> · <a href="{{ url_for('forgot_voter_id') }}">Forgot your Voter ID?</a>{% endif %}</p></div>
+    {% endif %}
+    <form method="post" action="{{ url_for('create_account_page') }}" class="stack" data-busy="Creating..." autocomplete="off" data-no-autofill>
+      {{ ui.csrf() }}
+      <div class="field float">
+        <label for="school_student_no">School student number</label>
+        <input id="school_student_no" name="school_student_no" required value="{{ form.school_student_no }}"
+               placeholder="e.g. {{ SCHOOL_NO_EXAMPLE }}" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="20"
+               aria-describedby="school-no-hint" {{ field_attrs('school_student_no') }}{% if not field %} autofocus{% endif %}>
+        <p class="hint" id="school-no-hint">The number on your school ID, in the format {{ SCHOOL_NO_EXAMPLE }}.</p>
+      </div>
+      <div class="field float">
+        <label for="full_name">Full name</label>
+        <input id="full_name" name="full_name" required maxlength="80" value="{{ form.full_name }}" autocomplete="name"
+               placeholder="e.g. Juan Dela Cruz" {{ field_attrs('full_name') }}>
+      </div>
+      <div class="form-grid">
+        <div class="field float">
+          <label for="course">Course</label>
+          <input id="course" name="course" required maxlength="30" value="{{ form.course }}" placeholder="e.g. BSIT"
+                 autocapitalize="characters" {{ field_attrs('course') }}>
+        </div>
+        <div class="field float">
+          <label for="department">School / department</label>
+          <input id="department" name="department" required maxlength="80" value="{{ form.department }}"
+                 placeholder="e.g. College of Computing Studies" {{ field_attrs('department') }}>
+        </div>
+        <div class="field">
+          <label for="year">Year</label>
+          <select id="year" name="year" required {{ field_attrs('year') }}>
+            <option value="">Choose…</option>
+            {% for y in range(1, MAX_YEAR + 1) %}<option value="{{ y }}" {% if form.year == y|string %}selected{% endif %}>{{ y }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field float">
+          <label for="section">Section</label>
+          <input id="section" name="section" required maxlength="10" value="{{ form.section }}" placeholder="e.g. A"
+                 autocapitalize="characters" {{ field_attrs('section') }}>
+        </div>
+      </div>
+      <div class="field float">
+        <label for="email">Email <span class="muted">(optional)</span></label>
+        <input id="email" name="email" type="email" value="{{ form.email }}" maxlength="120" autocomplete="email" {{ field_attrs('email') }}>
+      </div>
+      <fieldset class="reg-pw">
+        <legend>Choose your password</legend>
+        {{ ui.password_field('password', 'password', 'Password', 'new-password',
+                             'minlength="8" data-strength="pw-strength" aria-describedby="pw-rules pw-strength"',
+                             invalid=(field == 'password'), float=True) }}
+        <div class="strength" id="pw-strength" aria-live="polite">
+          <div class="strength-bar" aria-hidden="true"><span></span></div>
+          <span class="strength-text"></span>
+        </div>
+        {{ ui.password_field('confirm_password', 'confirm_password', 'Confirm password', 'new-password',
+                             invalid=(field == 'confirm_password'), float=True) }}
+        <ul class="hint rules" id="pw-rules">
+          <li>At least 8 characters (longer is better)</li>
+          <li>Not your school student number</li>
+        </ul>
+      </fieldset>
+      <button class="btn btn-primary btn-lg btn-block" type="submit">{{ ui.icon('check') }} Create account</button>
+    </form>
+  </section>
+  <p class="auth-foot">Already have an account? <a href="{{ url_for('login') }}">Log in</a> · <a href="{{ url_for('forgot_voter_id') }}">Forgot your Voter ID?</a></p>
+  {% endif %}
+</div>
+{% endblock %}

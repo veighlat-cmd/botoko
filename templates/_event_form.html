@@ -1,0 +1,49 @@
+{# Fields of a voting event (create + edit), laid out on a CSS grid (static/dash.css "ADMIN FORMS"):
+     row 1  Event name | School / organization
+     row 2  What is this voting for?            (full width, 3 lines)
+     row 3  Voting starts | Voting ends         (hint "Philippine time" under each field)
+     row 4  School year (receipt)               (half width)
+     then the two switch cards, then the buttons (bottom right).
+   Set `e` to an event to pre-fill (or none for a new one), `pfx` to a unique id prefix,
+   `submit_label` for the main button and `cancel` = "close" (closes the New event card) or "reset". #}
+{% import "_macros.html" as ui %}
+<div class="form-grid">
+  <div class="field"><label for="{{ pfx }}-name">Event name</label>
+    <input id="{{ pfx }}-name" name="name" value="{{ e.name if e }}" required maxlength="120" placeholder="e.g. SSC Election 2026"></div>
+  <div class="field"><label for="{{ pfx }}-org">School / organization</label>
+    <input id="{{ pfx }}-org" name="organization" value="{{ e.organization if e }}" maxlength="120" placeholder="e.g. Supreme Student Council"></div>
+  <div class="field span-full"><label for="{{ pfx }}-desc">What is this voting for?</label>
+    <textarea id="{{ pfx }}-desc" name="description" rows="3" maxlength="1000" aria-describedby="{{ pfx }}-desc-hint"
+              placeholder="e.g. Elect the officers of the Supreme Student Council for School Year 2026-2027.">{{ e.description if e }}</textarea>
+    <p class="hint" id="{{ pfx }}-desc-hint">Shown to everyone, also before voting starts.</p></div>
+  <div class="field"><label for="{{ pfx }}-start">Voting starts</label>
+    <input id="{{ pfx }}-start" name="starts_at" type="datetime-local" value="{{ e.starts_input if e }}" aria-describedby="{{ pfx }}-start-hint">
+    <p class="hint" id="{{ pfx }}-start-hint">Philippine time</p></div>
+  <div class="field"><label for="{{ pfx }}-end">Voting ends</label>
+    <input id="{{ pfx }}-end" name="ends_at" type="datetime-local" value="{{ e.ends_input if e }}" aria-describedby="{{ pfx }}-end-hint">
+    <p class="hint" id="{{ pfx }}-end-hint">Philippine time</p></div>
+  <div class="field"><label for="{{ pfx }}-sy">School year (receipt)</label>
+    <input id="{{ pfx }}-sy" name="school_year" value="{{ e.school_year_setting if e }}" maxlength="20" placeholder="e.g. 2026-2027"
+           aria-describedby="{{ pfx }}-sy-hint">
+    <p class="hint" id="{{ pfx }}-sy-hint">Automatic if empty.</p></div>
+  <div class="span-full form-toggles">
+    <label class="check-row" for="{{ pfx }}-auto">
+      <input id="{{ pfx }}-auto" type="checkbox" name="auto_approve" value="1" {% if not e or e.auto_approve %}checked{% endif %}>
+      <span><b>Auto-approve registrations from verified accounts</b><span class="hint">On: a student whose account you already
+        verified is registered at once when they tap Register (no second approval). Off: every registration waits in the Registrations tab.</span></span>
+    </label>
+    <label class="check-row" for="{{ pfx }}-autopub">
+      <input id="{{ pfx }}-autopub" type="checkbox" name="auto_publish" value="1" {% if e and e.auto_publish %}checked{% endif %}>
+      <span><b>Publish results automatically when voting ends</b><span class="hint">Off (recommended): you review the final
+        results first and click "Publish official results". On: students see the final results and winners as soon as voting ends.</span></span>
+    </label>
+  </div>
+  <div class="span-full form-actions">
+    {% if cancel == 'close' %}
+    <button type="button" class="btn" data-close-details="{{ close_id }}">Cancel</button>
+    {% else %}
+    <button type="reset" class="btn">Cancel</button>
+    {% endif %}
+    <button class="btn btn-primary" type="submit">{% if not e %}{{ ui.icon('plus') }}{% endif %}{{ submit_label }}</button>
+  </div>
+</div>

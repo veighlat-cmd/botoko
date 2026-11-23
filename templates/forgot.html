@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Forgot your Voter ID · BotoKo{% endblock %}
+{% block main_class %}center{% endblock %}
+{% block content %}
+<div class="auth reg">
+  <div class="auth-brand">
+    {{ ui.logo(96) }}
+    <h1>Forgot your Voter ID?</h1>
+    <p class="tagline">Type your school student number and your password.</p>
+  </div>
+  {% if result %}
+  <section class="card reg-result" aria-labelledby="fv-heading">
+    <h2 id="fv-heading" class="reg-name">{{ result.name }}</h2>
+    <p class="muted small mono">{{ result.school_student_no }}</p>
+    <div class="code-box voter-id-box">
+      <span class="label">Your Voter ID</span>
+      <span class="code" id="voter-id">{{ result.voter_id }}</span>
+      <button type="button" class="btn btn-primary btn-sm" data-copy="#voter-id" hidden>{{ ui.icon('copy') }}<span class="copy-label">Copy Voter ID</span></button>
+      <p class="hint save-hint">{{ ui.icon('alert') }} <b>Save it now.</b> You log in with this Voter ID and your password.</p>
+    </div>
+    <p class="reg-status-line">Account status:
+      {% if result.status == 'verified' %}{{ ui.reg_badge('approved', 'Verified') }}{% elif result.status == 'pending' %}{{ ui.reg_badge('pending', 'Pending verification') }}{% else %}{{ ui.reg_badge('rejected', 'Rejected') }}{% endif %}</p>
+    {% if result.status == 'pending' %}<p class="hint">Your account is waiting for verification by the election committee.</p>
+    {% elif result.status == 'rejected' %}<p class="reg-reason"><b>Reason:</b> {{ result.reason or 'No reason given.' }}</p>{% endif %}
+    <a class="btn btn-primary btn-lg btn-block" href="{{ url_for('login') }}">{{ ui.icon('lock') }} Log in</a>
+  </section>
+  {% else %}
+  <section class="card" aria-labelledby="fv-heading">
+    <h2 id="fv-heading" class="sr-only">Find my Voter ID</h2>
+    <form method="post" action="{{ url_for('forgot_voter_id') }}" class="stack" data-busy="Checking..." autocomplete="off" data-no-autofill>
+      {{ ui.csrf() }}
+      {% if error %}<div class="alert alert-error" role="alert" id="form-error">{{ ui.icon('alert') }}<p>{{ error }}</p></div>{% endif %}
+      <div class="field float">
+        <label for="school_student_no">School student number</label>
+        <input id="school_student_no" name="school_student_no" required value="{{ school_no }}" maxlength="20"
+               placeholder="e.g. {{ SCHOOL_NO_EXAMPLE }}" inputmode="numeric" autocomplete="off" spellcheck="false"
+               {% if error %}aria-invalid="true" aria-describedby="form-error"{% else %}autofocus{% endif %}>
+      </div>
+      {{ ui.password_field('password', 'password', 'Password', 'new-password', invalid=error is not none, float=True) }}
+      <button class="btn btn-primary btn-lg btn-block" type="submit">{{ ui.icon('search') }} Show my Voter ID</button>
+    </form>
+  </section>
+  <p class="auth-foot"><a href="{{ url_for('login') }}">Back to log in</a> · Don't have an account? <a href="{{ url_for('create_account_page') }}">Create account</a></p>
+  {% endif %}
+</div>
+{% endblock %}

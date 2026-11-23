@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Check the class list · BotoKo{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+{# Shown when an import has problems (nothing was created) or nothing new to create. #}
+<div class="pagebar"><a class="btn btn-ghost back-btn" href="{{ url_for('admin') }}#students">{{ ui.icon('back') }}<span>Back to Students</span></a></div>
+<p class="eyebrow">COMELEC admin · Students</p>
+{% if errors %}
+<h1>Please fix {{ errors|length }} row{{ '' if errors|length == 1 else 's' }}</h1>
+<div class="alert alert-error" role="alert" style="margin-bottom:var(--s-4)">{{ ui.icon('alert') }}
+  <p><strong>No accounts were created.</strong>Fix the rows below, then press "Check &amp; create accounts" again.
+    The list you sent is already filled in.</p></div>
+{% else %}
+<h1>Nothing new to create</h1>
+<div class="alert alert-info" style="margin-bottom:var(--s-4)">{{ ui.icon('info') }}
+  <p>All {{ total }} student{{ '' if total == 1 else 's' }} in this list already have an account.</p></div>
+{% endif %}
+
+<div class="panel-grid">
+  <section class="card">
+    {% if errors %}
+    <div class="card-head"><h2>{{ ui.icon('alert') }} Rows with problems</h2><span class="badge badge-bad">{{ errors|length }}</span></div>
+    <ul class="list import-errors">
+      {% for line, reason in errors %}
+      <li><span class="badge badge-bad">Line {{ line }}</span><span>{{ reason }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if skipped %}
+    <div class="card-head" style="margin-top:var(--s-4)"><h2>{{ ui.icon('users') }} Already registered (skipped)</h2><span class="badge">{{ skipped|length }}</span></div>
+    <ul class="list import-errors">
+      {% for line, number in skipped %}
+      <li><span class="badge">Line {{ line }}</span><span class="mono">{{ number }}</span><span class="muted small">already has an account</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <p class="hint" style="margin-top:var(--s-3)">Each line must be: <code>school_student_no, full_name, course, department, year, section</code>.
+      School numbers look like {{ SCHOOL_NO_EXAMPLE }}; year is 1 to {{ MAX_YEAR }}.</p>
+  </section>
+  <section class="card">
+    <div class="card-head"><h2>{{ ui.icon('edit') }} Fix and try again</h2></div>
+    {% include "_import_form.html" %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,21 @@
+{# Body of the dashboard's "Results by event" card for ONE event `d` (admin only). Drawn inside admin.html, and by
+   /admin/api/results-card when the admin picks another event (admin.js swaps it in and starts its live updates).
+   The Parallel processing panel is NOT repeated here: it stays in the Results tab. #}
+{% import "_macros.html" as ui %}
+<div class="dash-results-body" data-dash-event="{{ d.id }}">
+  <p class="dash-results-status">
+    {{ ui.status_badge(d) }}
+    <span class="badge {{ 'badge-open' if d.is_open else 'badge-closed' }}">{{ 'Open' if d.is_open else ('Not started' if d.status == 'upcoming' else 'Closed') }}</span>
+    {% if d.status == 'previous' %}
+    <span class="badge {{ 'badge-ok' if d.published else 'badge-bad' }}">{{ 'Results published' if d.published else 'Results not published' }}</span>
+    {% endif %}
+    <span class="muted small">Auto-publish {{ 'ON' if d.auto_publish else 'OFF' }} · {{ d.ballots }} of {{ d.registered }} voted</span>
+  </p>
+  {% if d.status == 'upcoming' %}
+  <div class="empty dash-results-empty">{{ ui.icon('clock') }}
+    <p><b>Voting has not started yet.</b> {{ d.name }} starts {{ d.starts_txt or 'when COMELEC opens it' }}.
+      Results appear here as soon as the first ballots come in.</p></div>
+  {% else %}
+  {% with ev=d, election=d, in_admin=true, no_parallel=true, id_prefix='dash-' %}{% include "_results.html" %}{% endwith %}
+  {% endif %}
+</div>

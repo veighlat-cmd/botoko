@@ -1,0 +1,96 @@
+{# Small reusable pieces. Import with: {% import "_macros.html" as ui %} #}
+
+{# BotoKo logo: a ballot with a check going into a ballot box (flag colours). #}
+{% macro logo(size=32) -%}
+{#- The BotoKo seal (static/logo-*.png). The browser picks the sharpest copy for the screen. -#}
+{%- if size <= 48 %}{% set s1, s2, s3 = 'logo-64.png', 'logo-128.png', 'logo-192.png' %}
+{%- elif size <= 100 %}{% set s1, s2, s3 = 'logo-128.png', 'logo-192.png', 'logo-512.png' %}
+{%- else %}{% set s1, s2, s3 = 'logo-192.png', 'logo-512.png', 'logo-512.png' %}{% endif -%}
+<img class="logo" src="{{ asset(s1) }}" srcset="{{ asset(s1) }} 1x, {{ asset(s2) }} 2x, {{ asset(s3) }} 3x" width="{{ size }}" height="{{ size }}" alt="" decoding="async">
+{%- endmacro %}
+
+{# Icon from the sprite in _icons.html, e.g. {{ ui.icon('check') }} #}
+{% macro icon(name, cls="") -%}
+<svg class="icon {{ cls }}" aria-hidden="true" focusable="false"><use href="#i-{{ name }}"></use></svg>
+{%- endmacro %}
+
+{# Round candidate picture: their photo if COMELEC uploaded one, otherwise their
+   initials coloured by party (or name). size = pixels; must match the CSS size class
+   (sm = 34, default = 44, lg = 56) so the page doesn't jump while photos load. #}
+{% macro avatar(name, party="", cls="", photo=None, size=44) -%}
+{% if photo -%}
+<img class="avatar {{ cls }}" src="{{ photo }}" alt="Photo of {{ name }}" width="{{ size }}" height="{{ size }}" loading="lazy" decoding="async">
+{%- else -%}
+<span class="avatar tone-{{ (party or name)|tone }} {{ cls }}" aria-hidden="true">{{ name|initials }}</span>
+{%- endif %}
+{%- endmacro %}
+
+{# Back button. Goes back in browser history when the previous page was a BotoKo page,
+   otherwise follows `fallback` (so it never leads to a blank page or another site).
+   only_with_history=True: only show the button when there is a BotoKo page to go back to. #}
+{% macro back(fallback, label="Back", only_with_history=False, cls="") -%}
+<a class="btn btn-ghost back-btn hide-in-projector {{ cls }}" href="{{ fallback }}"
+   data-back{% if only_with_history %}="history" hidden{% endif %}>{{ icon('back') }}<span>{{ label }}</span></a>
+{%- endmacro %}
+
+{# "Juan Dela Cruz · BSIT 3-A" for the logged-in student (group left out if not filled in yet). #}
+{% macro voter_line(student) -%}
+{%- set grp = student|group -%}
+<p class="voter-line">{{ icon('users') }}<span><b>{{ student.full_name }}</b>{% if grp %} &middot; {{ grp }}{% endif %}</span></p>
+{%- endmacro %}
+
+{# Hidden CSRF field: every POST form must include this. #}
+{% macro csrf() -%}
+<input type="hidden" name="csrf" value="{{ csrf_token() }}">
+{%- endmacro %}
+
+{# Back button + breadcrumbs. items = [{"label", "url"}], the last one is the current page.
+   Back goes to the previous BotoKo page, or to the parent crumb when there is no history. #}
+{% macro crumbbar(items, logout=False) -%}
+{%- set parent = items[-2].url if items|length > 1 else url_for('index') -%}
+<div class="crumbbar hide-in-projector">
+  {% if logout %}{{ logout_button() }}{% else %}{{ back(parent) }}{% endif %}
+  <nav class="breadcrumbs" aria-label="Breadcrumb"><ol>
+    {#- Links = pill buttons (home icon on "Events", ballot icon on the event); the CURRENT page is plain bold
+        text (aria-current, not clickable). Long names end in "..." and show the full name on hover (title). #}
+    {%- for c in items %}
+    <li>{% if c.url and not loop.last %}<a class="crumb" href="{{ c.url }}" title="{{ c.label }}">{{ icon('home' if loop.first else 'ballot') }}<span>{{ c.label }}</span></a>{% else %}<span class="crumb-current" aria-current="page" title="{{ c.label }}">{{ c.label }}</span>{% endif %}</li>
+    {%- endfor %}
+  </ol></nav>
+</div>
+{%- endmacro %}
+
+{# "Log out" in the place of the Back button (the event list is the students' home page, so there is
+   nothing to go back to). Asks first; then the normal CSRF-protected POST /logout. #}
+{% macro logout_button() -%}
+<form method="post" action="{{ url_for('logout') }}" class="crumb-logout" data-logout-form
+      data-confirm="Log out of BotoKo?" data-confirm-ok="Log out">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <button type="submit" class="btn btn-ghost back-btn">{{ icon('logout') }}<span>Log out</span></button>
+</form>
+{%- endmacro %}
+
+{# Status badge of a voting event: Current / Upcoming / Previous #}
+{% macro status_badge(ev) -%}
+<span class="badge status-{{ ev.status }}">{% if ev.status == 'current' %}<span class="dot" aria-hidden="true"></span>{% endif %}{{ ev.status_label }}</span>
+{%- endmacro %}
+
+{# Password input with a Show/Hide button (app.js). extra = more attributes, e.g. minlength. #}
+{% macro password_field(id, name, label, autocomplete, extra='', invalid=False, hint='', float=False) -%}
+<div class="field{{ ' float' if float }}">
+  <label for="{{ id }}">{{ label }}</label>
+  <div class="password-wrap">
+    <input id="{{ id }}" name="{{ name }}" type="password" required autocomplete="{{ autocomplete }}"
+           autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="128"
+           {% if invalid %}aria-invalid="true" aria-describedby="form-error"{% endif %} {{ extra|safe }}>
+    <button type="button" class="password-toggle" data-toggle-password aria-controls="{{ id }}"
+            aria-pressed="false" aria-label="Show {{ label|lower }}" hidden>{{ icon('eye') }}<span class="pw-label">Show</span></button>
+  </div>
+  {% if hint %}<p class="hint">{{ hint }}</p>{% endif %}
+</div>
+{%- endmacro %}
+
+{# Registration status badge: pending / approved / rejected / removed #}
+{% macro reg_badge(status, label=None) -%}
+<span class="badge reg-{{ status }}">{% if status == 'approved' %}{{ icon('check') }}{% elif status == 'pending' %}{{ icon('clock') }}{% elif status in ('rejected', 'removed') %}{{ icon('x') }}{% endif %}{{ (label or status)|upper }}</span>
+{%- endmacro %}

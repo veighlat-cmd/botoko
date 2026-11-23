@@ -1,0 +1,57 @@
+{# Admin dashboard, FINISHED event: publish status, winners per position (from the server-side tally),
+   ties that need a decision, and the official report / CSV. Needs: ev, winners. #}
+{% import "_macros.html" as ui %}
+<section class="card official-card {{ 'is-published' if ev.published else 'is-pending' }}" aria-labelledby="winners-title">
+  <div class="official-head">
+    <div>
+      <h2 id="winners-title">{{ ui.icon('crown') }} Winners</h2>
+      {% if ev.published %}
+      <span class="badge badge-ok">{{ ui.icon('check') }} Official results published{% if ev.published_txt %} · {{ ev.published_txt }}{% endif %}</span>
+      {% else %}
+      <span class="badge badge-warn">{{ ui.icon('lock') }} Final results - not yet published</span>
+      {% endif %}
+    </div>
+    <div class="official-actions">
+      {% if not ev.published %}
+      <form method="post" action="{{ url_for('admin_publish_results') }}" data-confirm="Publish the official results of {{ ev.name }}?"
+            data-confirm-text="Students will see the final results and the winners right away." data-confirm-ok="Publish">
+        {{ ui.csrf() }}<input type="hidden" name="tab" value="overview"><input type="hidden" name="event_id" value="{{ ev.id }}"><button class="btn btn-primary" type="submit" id="publish-btn">{{ ui.icon('check') }} Publish official results</button></form>
+      {% else %}
+      <form method="post" action="{{ url_for('admin_unpublish_results') }}" data-confirm="Unpublish the results of {{ ev.name }}?"
+            data-confirm-text="Students will see 'The official results will be announced soon' again." data-confirm-ok="Unpublish" data-danger>
+        {{ ui.csrf() }}<input type="hidden" name="tab" value="overview"><input type="hidden" name="event_id" value="{{ ev.id }}"><button class="btn" type="submit" id="unpublish-btn">{{ ui.icon('x') }} Unpublish</button></form>
+      {% endif %}
+      <a class="btn" href="{{ url_for('admin_results_report', event=ev.id) }}" target="_blank" rel="noopener">{{ ui.icon('download') }} Print / Save as PDF</a>
+      <a class="btn" href="{{ url_for('admin_results_csv', event=ev.id) }}">{{ ui.icon('download') }} Download results (CSV)</a>
+    </div>
+  </div>
+  {% if not ev.published %}
+  <p class="hint">Only you can see these results. Review them, then publish. Students see
+    "Voting has ended. The official results will be announced by the election committee soon." until then.</p>
+  {% endif %}
+  <ul class="winners-admin">
+    {% for p in winners %}
+    <li class="wa-pos">
+      <div class="wa-head"><b>{{ p.name }}</b>{% if p.seats > 1 %}<span class="badge">{{ p.seats }} seats</span>{% endif %}</div>
+      {% for c in p.winners %}
+      <div class="wa-row is-win">{{ ui.avatar(c.name, c.party, 'sm', c.photo, 34) }}
+        <span class="wa-name"><b>{{ c.name }}</b>{% if c.party %}<span class="muted small">{{ c.party }}</span>{% endif %}</span>
+        <span class="wa-votes tnum"><b>{{ c.votes }}</b> votes · {{ c.pct }}% of voters</span>
+        <span class="badge badge-lead">{{ ui.icon('crown') }} Winner</span></div>
+      {% endfor %}
+      {% if p.tie %}
+      <div class="wa-tie" role="note">{{ ui.icon('alert') }}
+        <span><b>Tie for last seat - needs a decision.</b> {{ p.seats_left }} seat{{ 's' if p.seats_left != 1 }} left,
+          {{ p.tied|length }} candidates with {{ p.tied[0].votes }} votes each:</span></div>
+      {% for c in p.tied %}
+      <div class="wa-row is-tie">{{ ui.avatar(c.name, c.party, 'sm', c.photo, 34) }}
+        <span class="wa-name"><b>{{ c.name }}</b>{% if c.party %}<span class="muted small">{{ c.party }}</span>{% endif %}</span>
+        <span class="wa-votes tnum"><b>{{ c.votes }}</b> votes · {{ c.pct }}% of voters</span>
+        <span class="badge badge-warn">Tie</span></div>
+      {% endfor %}
+      {% endif %}
+      {% if not p.winners and not p.tie %}<p class="muted small">No votes for this position.</p>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>

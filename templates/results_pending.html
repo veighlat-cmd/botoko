@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ ev.name }} · Results · BotoKo{% endblock %}
+{# Voting has ended but COMELEC hasn't published the official results yet: no numbers, no winners. #}
+{% block scripts %}
+<script>
+  /* Every 5 s (paused while the tab is hidden): are the official results out yet? As soon as COMELEC publishes
+     them, the page reloads and shows the winners. Same remote procedure as the live results (rpc get_results). */
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.rpc) return;
+    var timer = null;
+    function check() {
+      clearTimeout(timer);
+      if (document.hidden) return;
+      rpc('get_results', { event_id: {{ ev.id }} }).then(function () { location.reload(); },
+        function () { timer = setTimeout(check, 5000); });
+    }
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+    timer = setTimeout(check, 5000);
+  });
+</script>
+{% endblock %}
+{% block content %}
+<section class="card results-pending" aria-labelledby="rp-title" data-results-pending="{{ ev.id }}">
+  <div class="rp-icon" aria-hidden="true">{{ ui.icon('clock') }}</div>
+  <p class="eyebrow">{{ ev.name }}</p>
+  <h1 id="rp-title">Voting has ended.</h1>
+  <p class="rp-text">The official results will be announced by the election committee soon.</p>
+  <dl class="event-dates big">
+    <div><dt>{{ ui.icon('clock') }} Voting started</dt><dd>{{ ev.starts_txt or 'Not recorded' }}</dd></div>
+    <div><dt>{{ ui.icon('lock') }} Voting ended</dt><dd>{{ ev.ends_txt or 'Closed by COMELEC' }}</dd></div>
+  </dl>
+  <div class="actions-row">
+    <a class="btn btn-primary" href="{{ url_for('index') }}#previous">{{ ui.icon('back') }} All events</a>
+    <a class="btn" href="{{ url_for('my_account') }}">{{ ui.icon('users') }} My Account</a>
+  </div>
+</section>
+{% endblock %}

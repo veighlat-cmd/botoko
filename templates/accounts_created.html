@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ 'New password' if reset else 'Accounts created' }} · BotoKo{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+{# Passwords are shown ONLY on this page (the server never stores them in readable form).
+   The page is sent with Cache-Control: no-store, so going back to it shows nothing. #}
+<div class="no-print">
+  <div class="pagebar"><a class="btn btn-ghost back-btn" href="{{ url_for('admin') }}#students">{{ ui.icon('back') }}<span>Back to Students</span></a></div>
+  <p class="eyebrow">COMELEC admin · Students</p>
+  {% if reset %}
+  <h1>New password for {{ created[0].full_name }}</h1>
+  <p class="muted">The old password no longer works. Give this slip to the student.</p>
+  {% else %}
+  <h1>{{ created|length }} account{{ '' if created|length == 1 else 's' }} created</h1>
+  {% if skipped %}<p class="muted">{{ skipped|length }} student{{ '' if skipped|length == 1 else 's' }} skipped because they already have an account
+    (lines {{ skipped|map(attribute=0)|join(', ') }}).</p>{% endif %}
+  {% endif %}
+
+  <div class="alert alert-warn" role="alert" style="margin:var(--s-4) 0">{{ ui.icon('lock') }}
+    <p><strong>This is the only time these passwords are shown.</strong>Download the CSV and/or print the slips now.
+      If you leave this page, you'll have to reset a student's password to see a new one.</p></div>
+
+  <div class="slip-actions">
+    <a class="btn btn-primary" download="botoko-{{ 'password' if reset else 'accounts' }}.csv"
+       href="data:text/csv;charset=utf-8,{{ csv_data|urlencode }}">{{ ui.icon('download') }} Download CSV</a>
+    <button class="btn" type="button" data-print>{{ ui.icon('ballot') }} Print voter slips</button>
+  </div>
+  <p class="hint">CSV columns: voter_id, password, school_student_no, full_name, course, department, year, section.
+    Slips print about 10 per page, with dashed lines to cut along.</p>
+  <h2 class="eyebrow" style="margin-top:var(--s-5)">Voter slips ({{ created|length }})</h2>
+</div>
+
+<div class="slips">
+  {% for a in created %}
+  <article class="slip">
+    <div class="slip-head">{{ ui.logo(22) }}<span><b>BotoKo</b> · {{ election.title }}</span></div>
+    <p class="slip-name">{{ a.full_name }}</p>
+    <p class="slip-group">{{ a.course }}{% if a.year %} {{ a.year }}-{{ a.section }}{% endif %}{% if a.school_student_no %} · {{ a.school_student_no }}{% endif %}</p>
+    <dl class="slip-creds">
+      <div><dt>Voter ID</dt><dd class="mono">{{ a.voter_id }}</dd></div>
+      <div><dt>Password</dt><dd class="mono">{{ a.password }}</dd></div>
+    </dl>
+    <p class="slip-foot">Log in at {{ request.host_url }} · Keep this slip private.</p>
+  </article>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  document.querySelectorAll('[data-print]').forEach(function (b) {
+    b.addEventListener('click', function () { window.print(); });
+  });
+</script>
+{% endblock %}

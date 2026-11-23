@@ -1,0 +1,869 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% import "_admin_rows.html" as rows %}
+{% block title %}Admin · BotoKo{% endblock %}
+{% block main_class %}wide{% endblock %}
+
+{# Phone-only shortcut back to the Overview tab (on wide screens the tab bar is enough). #}
+{% macro to_overview() %}<a class="btn btn-ghost back-btn mobile-only" href="#overview">{{ ui.icon('back') }}<span>Back to Overview</span></a>{% endmacro %}
+
+{# Photo picker. static/admin.js crops/shrinks the chosen photo in the browser and shows
+   a preview; it is only uploaded when the form is saved. #}
+{# Candidate details for the Add and Edit forms (c = existing candidate, or none when adding). #}
+{% macro cand_fields(prefix, c=None) %}
+<div class="field grow"><label for="{{ prefix }}-name">Full name</label>
+  <input id="{{ prefix }}-name" name="name" value="{{ c.name if c }}" required maxlength="80" placeholder="e.g. Juan Dela Cruz"></div>
+<div class="field grow"><label for="{{ prefix }}-party">Party / partylist (optional)</label>
+  <input id="{{ prefix }}-party" name="party" value="{{ c.party if c }}" maxlength="60" placeholder="e.g. Partido Bago"></div>
+<div class="field grow"><label for="{{ prefix }}-course">Course and year (optional)</label>
+  <input id="{{ prefix }}-course" name="course_year" value="{{ c.course_year if c }}" maxlength="40" placeholder="e.g. BSIT 3"></div>
+<div class="field field-wide"><label for="{{ prefix }}-motto">Platform / motto (optional, short)</label>
+  <input id="{{ prefix }}-motto" name="motto" value="{{ c.motto if c }}" maxlength="160"
+         placeholder="e.g. Serbisyong tapat para sa bawat estudyante"></div>
+<div class="field field-wide"><label for="{{ prefix }}-bg">Background (optional): achievements, experience, organizations</label>
+  <textarea id="{{ prefix }}-bg" name="background" rows="4" maxlength="1600" aria-describedby="{{ prefix }}-bg-hint"
+            placeholder="Class President, 2nd year&#10;Dean's Lister 2024-2025&#10;Member, Google Developer Student Club">{{ c.background if c }}</textarea>
+  <p class="hint" id="{{ prefix }}-bg-hint">One item per line (up to 12). The ballot card shows the first two; the rest are in "View full profile".</p></div>
+{% endmacro %}
+
+{% macro photo_field(input_id, c=None) %}
+<div class="field photo-field">
+  <span class="label" id="{{ input_id }}-label">Photo (optional)</span>
+  <div class="photo-pick">
+    <span class="photo-preview {{ 'has-photo' if c and c.photo }}" data-photo-preview>
+      {%- if c and c.photo %}{{ ui.avatar(c.name, c.party, '', c.photo, 64) }}{% else %}{{ ui.icon('image') }}{% endif -%}
+    </span>
+    <div class="photo-actions">
+      <input id="{{ input_id }}" type="file" name="photo" accept="image/jpeg,image/png,image/webp"
+             class="sr-only" data-photo-input aria-describedby="{{ input_id }}-status">
+      <label for="{{ input_id }}" class="btn btn-sm">{{ ui.icon('image') }} {{ 'Change photo' if c and c.photo else 'Choose photo' }}</label>
+      <p class="hint" id="{{ input_id }}-status" data-photo-status aria-live="polite">JPG, PNG or WebP. It is cropped to a square automatically.</p>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{# Hidden field telling the server which tab to come back to after the form is sent. #}
+{% macro tab(name) %}<input type="hidden" name="tab" value="{{ name }}"><input type="hidden" name="event_id" value="{{ ev.id }}">{% endmacro %}
+
+{# Open / close voting button (used in the header and in Settings). #}
+{% macro toggle_form(back_to) %}
+{# OPEN event: "End voting now" (any time, also before the scheduled end). UPCOMING: "Open voting" (start now).
+   FINISHED: no button (ending voting can't be undone here). With JavaScript admin.js calls the remote
+   procedure in data-rpc (close_voting / open_voting); without it, a normal form post to /admin/toggle. #}
+{% if ev.status == 'previous' %}
+<span class="badge status-previous voting-ended">{{ ui.icon('lock') }} Voting has ended</span>
+{% else %}
+<form method="post" action="{{ url_for('admin_toggle') }}" class="toggle-form"
+      data-rpc="{{ 'close_voting' if election.is_open else 'open_voting' }}" data-event="{{ ev.id }}"
+      data-confirm="{{ 'End voting now?' if election.is_open else 'Open voting?' }}"
+      data-confirm-text="{{ 'Students will no longer be able to vote. This cannot be undone.' if election.is_open else ('Registered students can log in to ' ~ ev.name ~ ' and vote right away.') }}"
+      data-confirm-ok="{{ 'End voting now' if election.is_open else 'Open voting' }}" {% if election.is_open %}data-danger{% endif %}>
+  {{ ui.csrf() }}{{ tab(back_to) }}<input type="hidden" name="mode" value="{{ 'closed' if election.is_open else 'open' }}">
+  {% if election.is_open %}
+  <button class="btn btn-danger" type="submit">{{ ui.icon('lock') }}<span class="toggle-label">End voting now</span></button>
+  {% else %}
+  <button class="btn btn-primary" type="submit"><span class="switch" aria-hidden="true"><span class="switch-knob"></span></span><span class="toggle-label">Open voting</span></button>
+  {% endif %}
+</form>
+{% endif %}
+{% endmacro %}
+
+{% block content %}
+{% set turnout = (100 * overview.ballots / overview.registered)|round|int if overview.registered else 0 %}
+{% set voted_count = students|selectattr('has_voted')|list|length %}
+{% set n_current = events|selectattr('status', 'equalto', 'current')|list|length %}
+{% set n_upcoming = events|selectattr('status', 'equalto', 'upcoming')|list|length %}
+{% set waiting = acc_counts.pending + reg_counts.pending %}
+{% macro side_tab(key, label, ico) -%}
+<a class="tab" role="tab" id="tab-{{ key }}" href="#{{ key }}" aria-controls="panel-{{ key }}" aria-selected="{{ 'true' if key == 'overview' else 'false' }}" data-label="{{ label }}">{{ ui.icon(ico) }}<span>{{ label }}</span>{{ caller() if caller is defined }}</a>
+{%- endmacro %}
+<div class="admin-shell" id="admin-shell">
+  {# ---------------- sidebar ---------------- #}
+  <aside class="admin-side" id="admin-side" aria-label="Admin navigation">
+    <a class="side-brand" href="{{ url_for('admin') }}">{{ ui.logo(48) }}<span><b>Boto<span style="color:var(--c-primary)">Ko</span></b><small>Election management</small></span></a>
+    <button type="button" class="side-collapse" data-side-collapse aria-label="Collapse the sidebar" data-tip="Collapse / expand">{{ ui.icon('back') }}</button>
+    <nav class="tabs side-nav" role="tablist" aria-label="Admin sections" aria-orientation="vertical">
+      <p class="side-group" role="presentation">Overview</p>
+      {{ side_tab('overview', 'Dashboard', 'grid') }}
+      {{ side_tab('results', 'Results', 'chart') }}
+      <p class="side-group" role="presentation">Management</p>
+      {{ side_tab('ballot', 'Ballot & candidates', 'ballot') }}
+      {{ side_tab('students', 'Voters', 'users') }}
+      {% call side_tab('accounts', 'Accounts', 'shield') %}<span class="tab-count reg-badge {{ 'is-zero' if not acc_counts.pending }}" data-a="tab-count" title="Accounts waiting for verification" aria-label="{{ acc_counts.pending }} pending">{{ acc_counts.pending }}</span>{% endcall %}
+      {% call side_tab('registrations', 'Registrations', 'inbox') %}<span class="tab-count reg-badge {{ 'is-zero' if not reg_counts.pending }}" data-r="tab-count" title="Pending registrations" aria-label="{{ reg_counts.pending }} pending">{{ reg_counts.pending }}</span>{% endcall %}
+      <p class="side-group" role="presentation">System</p>
+      {{ side_tab('settings', 'Settings', 'settings') }}
+    </nav>
+    <div class="side-foot">
+      {% if ev.status != 'upcoming' %}
+      <a class="side-link" href="{{ url_for('event_results', event_id=ev.id, projector=1) }}" target="_blank" rel="noopener">{{ ui.icon('expand') }}<span>Projector view</span></a>
+      {% endif %}
+      <form method="post" action="{{ url_for('logout') }}" data-confirm="Log out of the admin dashboard?" data-confirm-ok="Log out">
+        {{ ui.csrf() }}<button type="submit" class="side-link is-danger">{{ ui.icon('logout') }}<span>Sign out</span></button></form>
+    </div>
+  </aside>
+  <div class="side-backdrop" data-side-close></div>
+
+  <div class="admin-main">
+    {# ---------------- top bar ---------------- #}
+    <header class="admin-top">
+      <button type="button" class="icon-btn side-toggle" data-side-toggle aria-controls="admin-side" aria-expanded="false" aria-label="Open the menu">{{ ui.icon('menu') }}</button>
+      <nav class="crumbs" aria-label="Breadcrumb"><span>BotoKo</span><span aria-hidden="true">/</span><b data-crumb aria-current="page">Dashboard</b></nav>
+      <div class="top-right">
+        <span class="live-pill {{ '' if n_current else 'is-off' }}"><span class="dot" aria-hidden="true"></span><span class="live-text">{{ 'System live' if n_current else 'No voting open' }}</span></span>
+        <a class="icon-btn" href="#{{ 'accounts' if acc_counts.pending or not reg_counts.pending else 'registrations' }}" aria-label="{{ waiting }} waiting for approval" data-tip="{{ waiting }} waiting for approval">{{ ui.icon('bell') }}{% if waiting %}<span class="ping" aria-hidden="true"></span>{% endif %}</a>
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch light / dark mode" data-tip="Light / dark mode">{{ ui.icon('moon', 'i-moon') }}{{ ui.icon('sun', 'i-sun') }}</button>
+        <span class="admin-chip"><span class="menu-avatar" aria-hidden="true">A</span><span>Admin</span></span>
+      </div>
+    </header>
+
+    <div class="admin-body">
+{% include "_admin_warning.html" %}
+{# Event switcher: every tab below works on the event chosen here. #}
+<div class="event-switcher card">
+  <form method="get" action="{{ url_for('admin') }}" class="row switcher-form">
+    <div class="field grow">
+      <label for="event-select">{{ ui.icon('ballot') }} Voting event</label>
+      <select id="event-select" name="event" data-autosubmit>
+        {% for status, label in [('current', 'Current'), ('upcoming', 'Upcoming'), ('previous', 'Previous')] %}
+        {% set group = events|selectattr('status', 'equalto', status)|list %}
+        {% if group %}<optgroup label="{{ label }}">
+          {% for e in group %}<option value="{{ e.id }}" {% if e.id == ev.id %}selected{% endif %}>{{ e.name }} ({{ e.ballots }}/{{ e.registered }} voted)</option>{% endfor %}
+        </optgroup>{% endif %}
+        {% endfor %}
+      </select>
+    </div>
+    <noscript><button class="btn" type="submit">Switch</button></noscript>
+  </form>
+  {# With JavaScript this button opens the "Create a new voting event" card below; without it, the summary does. #}
+  <button type="button" class="btn new-event-btn" data-open-details="new-event" aria-controls="new-event" aria-expanded="false">{{ ui.icon('plus') }} New event</button>
+</div>
+<details class="new-event" id="new-event">
+  <summary class="btn">{{ ui.icon('plus') }} New event</summary>
+  <section class="card new-event-card" aria-labelledby="new-event-title">
+    <div class="card-head">
+      <div><h2 id="new-event-title">{{ ui.icon('calendar') }} Create a new voting event</h2>
+        <p class="card-sub">You can add positions and candidates right after creating it.</p></div>
+      <button type="button" class="btn btn-ghost btn-icon" data-close-details="new-event" aria-label="Close">{{ ui.icon('x') }}</button>
+    </div>
+    <form method="post" action="{{ url_for('admin_event_create') }}" class="new-event-form" data-busy="Creating...">
+      {{ ui.csrf() }}<input type="hidden" name="tab" value="ballot">
+      {% set e = none %}{% set pfx = 'new' %}{% set submit_label = 'Create event' %}{% set cancel = 'close' %}{% set close_id = 'new-event' %}
+      {% include "_event_form.html" %}
+    </form>
+  </section>
+</details>
+
+<div class="admin-head">
+  <div>
+    <p class="eyebrow">COMELEC admin{% if ev.organization %} · {{ ev.organization }}{% endif %}</p>
+    <h1>{{ ev.name }}</h1>
+    <div class="admin-status">
+      {{ ui.status_badge(ev) }}
+      <span class="muted small">{{ ui.icon('clock') }} {{ ev.starts_txt or 'Start not set' }} – {{ ev.ends_txt or 'end not set' }}
+        {% if ev.manual != 'auto' %}· set by hand{% endif %}</span>
+    </div>
+  </div>
+  <div class="admin-actions">
+    {{ toggle_form('overview') }}
+    <form method="post" action="{{ url_for('logout') }}" class="admin-logout" data-confirm="Log out of the admin dashboard?" data-confirm-ok="Log out">
+      {{ ui.csrf() }}<button type="submit" class="btn" title="You are logged out automatically after {{ ADMIN_IDLE_MINUTES }} minutes without activity">{{ ui.icon('logout') }} Log out</button></form>
+    {% if ev.status != 'upcoming' %}
+    <a class="btn {{ 'btn-live' if ev.status == 'current' }}" href="{{ url_for('event_results', event_id=ev.id) }}">{% if ev.status == 'current' %}<span class="live-dot" aria-hidden="true"></span> Live results{% else %}{{ ui.icon('chart') }} Results{% endif %}</a>
+    <a class="btn" href="{{ url_for('event_results', event_id=ev.id, projector=1) }}" target="_blank" rel="noopener">{{ ui.icon('expand') }} Open projector view</a>
+    {% endif %}
+  </div>
+</div>
+
+
+
+{# =============================== OVERVIEW (dashboard) =============================== #}
+<section class="tab-panel admin-overview is-active" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" data-overview="{{ url_for('admin_api_overview', event=ev.id) }}">
+  {% if ev.status == 'previous' and winners is not none %}{% include "_winners_admin.html" %}{% endif %}
+  <div class="section-title">
+    <h2>Dashboard</h2>
+    <span class="live" data-o="live"><span class="dot" aria-hidden="true"></span><span data-o="live-text">Auto-refresh</span></span>
+  </div>
+
+  {# Stat cards. The four numbers of THIS event refresh every 3 s (admin.js, data-o=...). #}
+  <div class="dash-stats summary-cards">
+    <div class="stat dash-stat tint tint-violet">
+      <span class="tint-ico">{{ ui.icon('calendar') }}</span><span class="trend" aria-hidden="true">{{ ui.icon('trend') }}</span>
+      <span class="stat-value">{{ events|length }}</span><span class="stat-label">Voting events</span>
+      <span class="tint-sub">{{ n_upcoming }} upcoming</span></div>
+    <div class="stat dash-stat tint tint-green">
+      <span class="tint-ico">{{ ui.icon('pulse') }}</span><span class="trend" aria-hidden="true">{{ ui.icon('trend') }}</span>
+      <span class="stat-value">{{ n_current }}</span><span class="stat-label">Open now</span>
+      <span class="tint-sub">{{ 'Live now' if n_current else 'None open' }}</span></div>
+    <div class="stat dash-stat tint tint-blue">
+      <span class="tint-ico">{{ ui.icon('users') }}</span><span class="trend" aria-hidden="true">{{ ui.icon('trend') }}</span>
+      <span class="stat-value" data-o="registered">{{ overview.registered }}</span><span class="stat-label">Registered voters</span>
+      <span class="tint-sub">In this event</span></div>
+    <div class="stat dash-stat tint tint-orange stat-good">
+      <span class="tint-ico">{{ ui.icon('ballot') }}</span><span class="trend" aria-hidden="true">{{ ui.icon('trend') }}</span>
+      <span class="stat-value" data-o="ballots">{{ overview.ballots }}</span><span class="stat-label">Votes cast</span>
+      <span class="tint-sub">Ballots recorded</span></div>
+    <div class="stat dash-stat tint tint-teal stat-accent">
+      <span class="tint-ico">{{ ui.icon('trend') }}</span>
+      <span class="stat-value" data-o="turnout">{{ turnout }}%</span><span class="stat-label">Turnout</span>
+      <div class="meter" aria-hidden="true"><span data-o="turnout-bar" style="transform:scaleX({{ turnout / 100 }})"></span></div></div>
+    <div class="stat dash-stat tint tint-red">
+      <span class="tint-ico">{{ ui.icon('clock') }}</span><span class="trend" aria-hidden="true">{{ ui.icon('trend') }}</span>
+      <span class="stat-value" data-o="pending">{{ overview.registered - overview.ballots }}</span><span class="stat-label">Not yet voted</span>
+      <span class="tint-sub">Still waiting</span></div>
+  </div>
+
+  <div class="dash-grid">
+    {# Turnout of every event (server numbers, drawn with CSS: no chart library) #}
+    <section class="card dash-card" aria-labelledby="turnout-chart-title">
+      <div class="card-head"><div><h2 id="turnout-chart-title">Voter turnout by election</h2>
+        <p class="card-sub">Percentage of registered voters who voted</p></div>{{ ui.icon('chart') }}</div>
+      {% set shown = (events|sort(attribute='id', reverse=True))[:6]|reverse|list %}
+      {% if shown %}
+      <div class="vchart" role="img" aria-label="Turnout: {% for e in shown %}{{ e.name }} {{ ((100 * e.ballots / e.registered)|round|int) if e.registered else 0 }}%{{ ', ' if not loop.last }}{% endfor %}">
+        {% for y in [100, 75, 50, 25, 0] %}<span class="y" style="bottom: {{ y }}%">{{ y }}%</span>{% endfor %}
+        {% for e in shown %}{% set pct = ((100 * e.ballots / e.registered)|round|int) if e.registered else 0 %}
+        <div class="vbar {{ 'is-current' if e.status == 'current' }}"><span class="vbar-val">{{ pct }}%</span><span class="vbar-fill" style="--h: {{ pct }}%; --i: {{ loop.index0 }}"></span></div>
+        {% endfor %}
+      </div>
+      <div class="vchart-labels" aria-hidden="true">{% for e in shown %}<span title="{{ e.name }}">{{ e.name }}</span>{% endfor %}</div>
+      {% else %}<p class="empty">{{ ui.icon('chart') }}No events yet.</p>{% endif %}
+    </section>
+
+    {# Latest results: vote share in the position with the most votes (this event) #}
+    <section class="card dash-card" aria-labelledby="donut-title">
+      {% set pos = (data.positions|sort(attribute='total', reverse=True)|first) if data.positions else none %}
+      <div class="card-head"><div><h2 id="donut-title">Latest results</h2>
+        <p class="card-sub">{{ ('Vote share · ' ~ pos.name) if pos else 'Vote share' }}</p></div>{{ ui.icon('shield') }}</div>
+      <div class="ring-wrap">
+        {% if pos and pos.total %}
+        {% set ns = namespace(acc=0, stops=[]) %}
+        {% for c in pos.candidates %}{% set start = ns.acc %}{% set ns.acc = ns.acc + 100 * c.votes / pos.total %}{% set ns.stops = ns.stops + ['var(--series-' ~ (loop.index if loop.index <= 8 else 'x') ~ ') ' ~ (start|round(2)) ~ '% ' ~ (ns.acc|round(2)) ~ '%'] %}{% endfor %}
+        <div class="ring" style="--donut: conic-gradient({{ ns.stops|join(', ') }})" role="img"
+             aria-label="{{ pos.name }}: {% for c in pos.candidates %}{{ c.name }} {{ c.votes }} votes{{ ', ' if not loop.last }}{% endfor %}"></div>
+        <ul class="legend">{% for c in pos.candidates %}<li><i style="background: var(--series-{{ loop.index if loop.index <= 8 else 'x' }})"></i>{{ c.name }} <b>{{ c.votes }}</b></li>{% endfor %}</ul>
+        {% else %}
+        <div class="ring is-empty" aria-hidden="true"></div>
+        <p class="muted small">No votes yet in {{ ev.name }}.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  {# Results by event: pick ANY event (current / upcoming / previous). admin.js loads the chosen event's results
+     without reloading the page and keeps it in the address (?results=<id>), so refresh and Back keep it. #}
+  {% if dash_ev %}
+  <section class="card dash-card dash-results" aria-labelledby="dash-results-title"
+           data-dash-results="{{ url_for('admin_api_results_card') }}" data-default="{{ dash_ev.id }}">
+    <div class="dash-results-head">
+      <div><h2 id="dash-results-title">{{ ui.icon('chart') }} Results by event</h2>
+        <p class="card-sub">Live tally, turnout and charts of the event you pick. The Results tab has the full view.</p></div>
+      <form method="get" action="{{ url_for('admin') }}" class="field dash-results-pick">
+        <label for="dash-results-select">Show results of</label>
+        <input type="hidden" name="event" value="{{ ev.id }}">
+        <select id="dash-results-select" name="results">
+          {% for status, label in [('current', 'Current'), ('upcoming', 'Upcoming'), ('previous', 'Previous')] %}
+          {% set group = events|selectattr('status', 'equalto', status)|list %}
+          {% if group %}<optgroup label="{{ label }}">
+            {% for e in group %}<option value="{{ e.id }}" {% if e.id == dash_ev.id %}selected{% endif %}>{{ e.name }} · {{ 'Open' if e.status == 'current' else ('Not started' if e.status == 'upcoming' else ('Closed · results published' if e.published else 'Closed · results not published')) }}</option>{% endfor %}
+          </optgroup>{% endif %}
+          {% endfor %}
+        </select>
+        <noscript><button class="btn btn-sm" type="submit">Show</button></noscript>
+      </form>
+    </div>
+    <div class="dash-results-slot">{% with d = dash_ev %}{% include "_dash_results.html" %}{% endwith %}</div>
+  </section>
+  {% endif %}
+
+  {# Recent elections #}
+  <section class="card dash-card" aria-labelledby="recent-el-title" style="margin-bottom:22px">
+    <div class="dash-section-title"><h2 id="recent-el-title">Recent elections</h2><a class="view-all" href="#event-select" data-focus-select>View all</a></div>
+    <div class="table-wrap">
+      <table class="dash-table">
+        <thead><tr><th scope="col">Election</th><th scope="col">Status</th><th scope="col">Dates</th><th scope="col">Voters</th><th scope="col">Votes cast</th><th scope="col">Turnout</th></tr></thead>
+        <tbody>
+          {% for e in (events|sort(attribute='id', reverse=True))[:6] %}{% set pct = ((100 * e.ballots / e.registered)|round|int) if e.registered else 0 %}
+          <tr>
+            <td class="el"><span class="el-name"><a href="{{ url_for('admin', event=e.id) }}">{{ e.name }}</a></span>{% if e.description %}<span class="el-desc">{{ e.description }}</span>{% endif %}</td>
+            <td data-label="">{{ ui.status_badge(e) }}</td>
+            <td data-label="" class="muted small">{{ e.starts_txt or 'Not set' }} — {{ e.ends_txt or 'not set' }}</td>
+            <td data-label="Voters" class="num">{{ e.registered }}</td>
+            <td data-label="Votes" class="num">{{ e.ballots }}</td>
+            <td data-label=""><span class="tbar"><span class="track"><span class="fill" style="--p: {{ pct / 100 }}"></span></span><span class="num">{{ pct }}%</span></span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="empty">No events yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {# Quick actions #}
+  <div class="quick">
+    <button type="button" class="quick-card" data-open-details="new-event" style="--tint: var(--t-violet); --tint-text: 176, 166, 255">
+      <span class="q-ico">{{ ui.icon('calendar') }}</span><span><b>New election</b><small>Create a voting event</small></span><span class="q-go">{{ ui.icon('arrow') }}</span></button>
+    <a class="quick-card" href="#ballot" style="--tint: var(--t-blue); --tint-text: 125, 176, 255">
+      <span class="q-ico">{{ ui.icon('plus') }}</span><span><b>Add candidate</b><small>Positions &amp; candidates</small></span><span class="q-go">{{ ui.icon('arrow') }}</span></a>
+    <a class="quick-card" href="#students" style="--tint: var(--t-green); --tint-text: 74, 222, 128">
+      <span class="q-ico">{{ ui.icon('users') }}</span><span><b>Register voters</b><small>Class list or tick students</small></span><span class="q-go">{{ ui.icon('arrow') }}</span></a>
+    <a class="quick-card" href="#results" style="--tint: var(--t-orange); --tint-text: 251, 191, 36">
+      <span class="q-ico">{{ ui.icon('chart') }}</span><span><b>View results</b><small>Live tally &amp; winners</small></span><span class="q-go">{{ ui.icon('arrow') }}</span></a>
+  </div>
+
+  <div class="panel-grid">
+    <section class="card">
+      <div class="card-head">
+        <h2>{{ ui.icon('shield') }} Integrity checks</h2>
+        {% set all_ok = overview.checks|rejectattr('ok')|list|length == 0 %}
+        <span class="badge {{ 'badge-ok' if all_ok else 'badge-bad' }}" data-o="checks-badge">{{ 'All passed' if all_ok else 'Problem found' }}</span>
+      </div>
+      <ul class="checks" data-o="checks">
+        {% for c in overview.checks %}
+        <li class="{{ 'ok' if c.ok else 'bad' }}">
+          <span class="check-ico">{{ ui.icon('check' if c.ok else 'x') }}</span>
+          <span><span class="check-label">{{ c.label }}</span><span class="check-detail">{{ c.detail }}</span></span>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>{{ ui.icon('clock') }} Latest ballots</h2></div>
+      <div class="table-wrap">
+        <table class="table table-nowrap">
+          <thead><tr><th scope="col">Time</th><th scope="col">Student</th><th scope="col">Worker PID</th><th scope="col">Thread</th></tr></thead>
+          <tbody data-o="recent">
+            {% for r in overview.recent %}
+            <tr><td class="tnum">{{ r.time }}</td><td class="mono">{{ r.student_no }}</td><td class="mono">{{ r.worker_pid }}</td><td class="mono">{{ r.thread }}</td></tr>
+            {% else %}
+            <tr><td colspan="4" class="empty">No votes yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="hint" style="margin-top:var(--s-3)">Last 10 ballots, newest first. Updated <span data-o="updated" class="tnum">{{ overview.generated_at }}</span></p>
+    </section>
+  </div>
+</section>
+
+{# =============================== BALLOT =============================== #}
+<section class="tab-panel" id="panel-ballot" role="tabpanel" aria-labelledby="tab-ballot">
+  {{ to_overview() }}
+  <div class="section-title">
+    <h2>Ballot</h2>
+    <span class="badge">{{ ballot|length }} positions · {{ ballot|sum(attribute='candidates', start=[])|length }} candidates</span>
+  </div>
+
+  {% if locked %}
+  <div class="alert alert-warn" style="margin-bottom:var(--s-4)">{{ ui.icon('lock') }}
+    <p><strong>The ballot is locked</strong>Votes have already been cast, so positions and candidates can't be changed.
+      To edit the ballot (for example after a rehearsal), reset the votes in <a href="#settings">Settings</a>.</p>
+  </div>
+  {% else %}
+  <section class="card" style="margin-bottom:var(--s-4)">
+    <form method="post" action="{{ url_for('admin_add_position') }}" class="row" data-busy="Adding...">
+      {{ ui.csrf() }}{{ tab('ballot') }}
+      <div class="field grow">
+        <label for="new-position">New position</label>
+        <input id="new-position" name="name" placeholder="e.g. President, or Councilor" required maxlength="80">
+      </div>
+      <div class="field seats-field">
+        <label for="new-seats">Number to elect</label>
+        <input id="new-seats" name="seats" type="number" min="1" max="20" value="1" inputmode="numeric"
+               aria-describedby="new-seats-hint">
+      </div>
+      <button class="btn btn-primary" type="submit">{{ ui.icon('plus') }} Add position</button>
+      <p class="hint field-wide" id="new-seats-hint">Usually 1. For example Councilor: 3 means each voter may choose up to 3 and the top 3 win.</p>
+    </form>
+  </section>
+  {% endif %}
+
+  {% for p in ballot %}
+  <article class="card pos-admin">
+    <div class="pos-admin-head">
+      <span class="pos-num" aria-hidden="true">{{ loop.index }}</span>
+      <h3>{{ p.name }}</h3>
+      {% if p.seats > 1 %}<span class="badge badge-lead">Vote up to {{ p.seats }}</span>{% endif %}
+      <span class="badge">{{ p.candidates|length }} candidate{{ '' if p.candidates|length == 1 else 's' }}</span>
+      {% if not locked %}
+      <div class="tools">
+        <form method="post" action="{{ url_for('admin_move_position') }}">
+          {{ ui.csrf() }}{{ tab('ballot') }}<input type="hidden" name="id" value="{{ p.id }}"><input type="hidden" name="dir" value="up">
+          <button class="btn btn-ghost btn-icon" type="submit" aria-label="Move {{ p.name }} up" {% if loop.first %}disabled{% endif %}>{{ ui.icon('up') }}</button>
+        </form>
+        <form method="post" action="{{ url_for('admin_move_position') }}">
+          {{ ui.csrf() }}{{ tab('ballot') }}<input type="hidden" name="id" value="{{ p.id }}"><input type="hidden" name="dir" value="down">
+          <button class="btn btn-ghost btn-icon" type="submit" aria-label="Move {{ p.name }} down" {% if loop.last %}disabled{% endif %}>{{ ui.icon('down') }}</button>
+        </form>
+        <form method="post" action="{{ url_for('admin_delete') }}" data-danger
+              data-confirm="Delete {{ p.name }}?" data-confirm-text="This also removes its {{ p.candidates|length }} candidate(s). This can't be undone." data-confirm-ok="Delete position">
+          {{ ui.csrf() }}{{ tab('ballot') }}<input type="hidden" name="kind" value="position"><input type="hidden" name="id" value="{{ p.id }}">
+          <button class="btn btn-ghost btn-icon btn-danger-text" type="submit" aria-label="Delete {{ p.name }}">{{ ui.icon('trash') }}</button>
+        </form>
+      </div>
+      <details class="editor">
+        <summary class="btn btn-ghost btn-sm"><span class="when-closed">{{ ui.icon('edit') }} Edit</span><span class="when-open">Cancel</span></summary>
+        <form method="post" action="{{ url_for('admin_edit_position') }}" class="editor-form row" data-busy="Saving...">
+          {{ ui.csrf() }}{{ tab('ballot') }}<input type="hidden" name="id" value="{{ p.id }}">
+          <div class="field grow"><label for="pos-name-{{ p.id }}">Position name</label>
+            <input id="pos-name-{{ p.id }}" name="name" value="{{ p.name }}" required maxlength="80"></div>
+          <div class="field seats-field"><label for="pos-seats-{{ p.id }}">Number to elect</label>
+            <input id="pos-seats-{{ p.id }}" name="seats" type="number" min="1" max="20" value="{{ p.seats }}" inputmode="numeric"></div>
+          <button class="btn btn-primary" type="submit">Save</button>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+
+    {% if not p.candidates %}
+    <p class="alert alert-warn" style="margin-top:var(--s-3)">{{ ui.icon('info') }}<span>No candidates yet. This position won't appear on the ballot until it has at least one.</span></p>
+    {% endif %}
+
+    <div class="cand-list">
+      {% for c in p.candidates %}
+      <div class="cand-admin">
+        {{ ui.avatar(c.name, c.party, 'md', c.photo, 40) }}
+        <span class="cand-text"><b>{{ c.name }}</b>
+          <span class="small muted cand-admin-meta">{{ [c.party, c.course_year]|select|join(' · ') }}</span>
+          {% if c.motto %}<span class="small cand-admin-motto">“{{ c.motto }}”</span>{% endif %}
+          {% set bg = c.background.splitlines()|select|list %}
+          {% if bg %}<span class="small muted">{{ bg|length }} background item{{ '' if bg|length == 1 else 's' }}</span>{% endif %}
+        </span>
+        {% if not locked %}
+        <details class="editor">
+          <summary class="btn btn-ghost btn-sm"><span class="when-closed">{{ ui.icon('edit') }} Edit</span><span class="when-open">Cancel</span></summary>
+          <form method="post" action="{{ url_for('admin_edit_candidate') }}" enctype="multipart/form-data"
+                class="editor-form row" data-busy="Saving..." data-photo-form>
+            {{ ui.csrf() }}{{ tab('ballot') }}<input type="hidden" name="id" value="{{ c.id }}">
+            {{ cand_fields('cand-' ~ c.id, c) }}
+            {{ photo_field('cand-photo-' ~ c.id, c) }}
+            <button class="btn btn-primary" type="submit">Save</button>
+          </form>
+          {% if c.photo %}
+          <form method="post" action="{{ url_for('admin_remove_photo') }}" class="remove-photo" data-danger
+                data-confirm="Remove {{ c.name }}'s photo?" data-confirm-text="Their initials will be shown instead." data-confirm-ok="Remove photo">
+            {{ ui.csrf() }}{{ tab('ballot') }}<input type="hidden" name="id" value="{{ c.id }}">
+            <button class="btn btn-ghost btn-sm btn-danger-text" type="submit">{{ ui.icon('trash') }} Remove photo</button>
+          </form>
+          {% endif %}
+        </details>
+        <form method="post" action="{{ url_for('admin_delete') }}" data-danger
+              data-confirm="Remove {{ c.name }}?" data-confirm-text="They will be taken off the {{ p.name }} ballot." data-confirm-ok="Remove candidate">
+          {{ ui.csrf() }}{{ tab('ballot') }}<input type="hidden" name="kind" value="candidate"><input type="hidden" name="id" value="{{ c.id }}">
+          <button class="btn btn-ghost btn-icon btn-danger-text" type="submit" aria-label="Remove {{ c.name }}">{{ ui.icon('trash') }}</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if not locked %}
+    <details class="add-cand" {% if not p.candidates %}open{% endif %}>
+      <summary>{{ ui.icon('plus') }} Add candidate for {{ p.name }}</summary>
+      <form method="post" action="{{ url_for('admin_add_candidate') }}" enctype="multipart/form-data"
+            class="row" style="margin-top:var(--s-2)" data-busy="Adding..." data-photo-form>
+        {{ ui.csrf() }}{{ tab('ballot') }}<input type="hidden" name="position_id" value="{{ p.id }}">
+        {{ cand_fields('add-' ~ p.id) }}
+        {{ photo_field('add-photo-' ~ p.id) }}
+        <button class="btn btn-primary" type="submit">{{ ui.icon('plus') }} Add</button>
+      </form>
+    </details>
+    {% endif %}
+  </article>
+  {% else %}
+  <div class="card empty">{{ ui.icon('ballot') }}No positions yet. Add the first one above (for example "President").</div>
+  {% endfor %}
+</section>
+
+{# =============================== STUDENTS =============================== #}
+<section class="tab-panel" id="panel-students" role="tabpanel" aria-labelledby="tab-students">
+  {{ to_overview() }}
+  <div class="section-title">
+    <h2>Students</h2>
+    <span class="badge">{{ students|selectattr('registered')|list|length }} registered in this event · {{ voted_count }} voted · {{ students|length }} accounts</span>
+  </div>
+  {# ---- the list ---- #}
+  <section class="card" aria-label="Student list">
+    <div class="filters">
+      <div class="search field">
+        <label for="student-search" class="sr-only">Search students</label>
+        {{ ui.icon('search') }}
+        <input id="student-search" type="search" placeholder="Search name, Voter ID or school number" autocomplete="off">
+      </div>
+      <div class="segmented" role="group" aria-label="Filter by registration and voting status">
+        <button type="button" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" data-filter="reg" aria-pressed="false">Registered</button>
+        <button type="button" data-filter="unreg" aria-pressed="false">Not registered</button>
+        <button type="button" data-filter="1" aria-pressed="false">Voted</button>
+        <button type="button" data-filter="0" aria-pressed="false">Not yet</button>
+      </div>
+    </div>
+    <div class="filter-selects">
+      {% for key, label, values in [
+           ('course', 'Course', students|map(attribute='course')|select|unique|sort),
+           ('dept', 'School/Department', students|map(attribute='department')|select|unique|sort),
+           ('year', 'Year', students|map(attribute='year_level')|select|unique|sort),
+           ('section', 'Section', students|map(attribute='section')|select|unique|sort)] %}
+      <div class="field">
+        <label for="filter-{{ key }}">{{ label }}</label>
+        <select id="filter-{{ key }}" data-select-filter="{{ key }}">
+          <option value="">All</option>
+          {% for v in values %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="hint" id="student-count" aria-live="polite">Showing {{ students|length }} of {{ students|length }}</p>
+    {# Register / unregister the checked students for THIS event #}
+    <form method="post" action="{{ url_for('admin_register') }}" id="register-form" data-busy="Saving...">
+    {{ ui.csrf() }}{{ tab('students') }}
+    <div class="register-bar">
+      <label class="check-all"><input type="checkbox" id="check-all" aria-controls="student-rows"> Select all shown</label>
+      <span class="hint" id="checked-count" aria-live="polite">0 selected</span>
+      <button class="btn btn-primary btn-sm" type="submit" name="action" value="register" data-disabled-reason="Select at least one student first">{{ ui.icon('plus') }} Register in {{ ev.name|truncate(28) }}</button>
+      <button class="btn btn-danger-outline btn-sm" type="submit" name="action" value="unregister" data-disabled-reason="Select at least one student first">{{ ui.icon('x') }} Unregister</button>
+    </div>
+    <div class="table-wrap students-scroll">
+      <table class="table student-table">
+        <thead><tr><th scope="col"><span class="sr-only">Select</span></th><th scope="col">Name</th><th scope="col">Voter ID</th><th scope="col">School no.</th>
+          <th scope="col">Course</th><th scope="col">Department</th><th scope="col">Yr-Sec</th>
+          <th scope="col">Status</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody id="student-rows">
+          {% for s in students %}
+          <tr data-voted="{{ 1 if s.has_voted else 0 }}" data-reg="{{ 1 if s.registered else 0 }}" data-course="{{ s.course or '' }}" data-dept="{{ s.department or '' }}"
+              data-year="{{ s.year_level or '' }}" data-section="{{ s.section or '' }}"
+              data-q="{{ (s.full_name ~ ' ' ~ s.voter_id ~ ' ' ~ s.voter_id|replace('-', '') ~ ' ' ~ (s.school_student_no or ''))|lower }}">
+            <td class="st-check"><input type="checkbox" name="student_id" value="{{ s.id }}" aria-label="Select {{ s.full_name }}"></td>
+            <td class="st-name"><b>{{ s.full_name }}</b></td>
+            <td class="mono" data-label="Voter ID">{{ s.voter_id }}</td>
+            <td class="mono" data-label="School no.">{{ s.school_student_no or '—' }}</td>
+            <td data-label="Course">{{ s.course or '—' }}</td>
+            <td data-label="Department">{{ s.department or '—' }}</td>
+            <td data-label="Yr-Sec">{% if s.year_level %}{{ s.year_level }}-{{ s.section }}{% else %}—{% endif %}</td>
+            <td class="st-status">{% if not s.registered %}<span class="badge badge-muted">Not registered</span>{% elif s.has_voted %}<span class="badge badge-ok" title="{{ s.voted_at }}">{{ ui.icon('check') }} Voted</span>{% else %}<span class="badge">Registered · not yet</span>{% endif %}
+              {% if not s.school_student_no %}<span class="badge badge-warn">Details missing</span>{% endif %}</td>
+            <td class="st-actions"><a class="btn btn-ghost btn-sm" href="{{ url_for('admin_student', student_id=s.id) }}"
+                  aria-label="Edit {{ s.full_name }} or reset password">{{ ui.icon('edit') }} Edit</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </form>
+    <div>
+      <p class="empty" id="student-empty" {% if students %}hidden{% endif %}>{{ ui.icon('users') }}{% if students %}No students match your search.{% else %}No student accounts yet. Create them below.{% endif %}</p>
+    </div>
+  </section>
+
+  <div class="panel-grid" style="margin-top:var(--s-4)">
+    {# ---- turnout by group (counts only, never anyone's choices) ---- #}
+    <section class="card" aria-labelledby="turnout-title">
+      <div class="card-head"><h2 id="turnout-title">{{ ui.icon('chart') }} Turnout by group</h2></div>
+      <div class="segmented" role="group" aria-label="Group by" style="margin-bottom:var(--s-3)">
+        <button type="button" data-turnout="course" aria-pressed="true">Course</button>
+        <button type="button" data-turnout="department" aria-pressed="false">Department</button>
+        <button type="button" data-turnout="class" aria-pressed="false">Year-Section</button>
+      </div>
+      {% for key, title in [('course', 'By course'), ('department', 'By school/department'), ('class', 'By year and section')] %}
+      <div class="turnout" data-turnout-panel="{{ key }}" {% if not loop.first %}data-start-hidden{% endif %}>
+        <h3 class="eyebrow">{{ title }}</h3>
+        <ul class="turnout-list">
+          {% for t in turnout_groups[key] %}
+          <li>
+            <div class="turnout-top"><span class="turnout-name">{{ t.name }}</span>
+              <span class="tnum"><b>{{ t.voted }}</b>/{{ t.registered }} · {{ t.pct }}%</span></div>
+            <div class="meter" aria-hidden="true"><span style="transform:scaleX({{ t.pct / 100 }})"></span></div>
+          </li>
+          {% else %}
+          <li class="empty">No students yet.</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+      <p class="hint">Counts only. BotoKo never shows who anyone voted for.</p>
+    </section>
+
+    {# ---- create accounts ---- #}
+    <section class="card" aria-labelledby="create-title">
+      <div class="card-head"><h2 id="create-title">{{ ui.icon('plus') }} Create accounts</h2></div>
+      {% set text = '' %}
+      {% include "_import_form.html" %}
+      <details class="add-cand" style="margin-top:var(--s-4)">
+        <summary>{{ ui.icon('users') }} Test accounts (for rehearsals)</summary>
+        <form method="post" action="{{ url_for('admin_accounts') }}" class="row" style="margin-top:var(--s-2)" data-busy="Creating...">
+          {{ ui.csrf() }}{{ tab('students') }}<input type="hidden" name="mode" value="test"><input type="hidden" name="register_event" value="1">
+          <div class="field grow"><label for="acc-count">How many</label>
+            <input id="acc-count" name="count" type="number" min="1" max="2000" value="60" inputmode="numeric"></div>
+          <button class="btn" type="submit">{{ ui.icon('plus') }} Create test accounts</button>
+        </form>
+        <p class="hint">Test accounts get school numbers 99-9-00001, 99-9-00002, … and sample details, and are registered in {{ ev.name }}.</p>
+      </details>
+    </section>
+  </div>
+</section>
+
+{# =============================== ACCOUNTS (verify each student once) =============================== #}
+<section class="tab-panel" id="panel-accounts" role="tabpanel" aria-labelledby="tab-accounts" data-acc-latest="{{ acc_counts.latest_id }}">
+  {{ to_overview() }}
+  <div class="section-title">
+    <h2>Accounts</h2>
+    <span class="live" data-a="live"><span class="dot" aria-hidden="true"></span><span>Auto-refresh</span></span>
+  </div>
+  <p class="muted small reg-intro">Students create their own account on the login page and get a Voter ID at once.
+    Verify each student <b>once</b> here. Verified students can register for events; with "Auto-approve registrations
+    from verified accounts" on (Settings), they don't need a second approval.</p>
+
+  <div class="new-regs alert alert-info" id="new-accounts" role="status" hidden>{{ ui.icon('users') }}
+    <p><strong data-a="new-text">New accounts are waiting.</strong>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('admin', event=ev.id) }}#accounts" data-a="reload">{{ ui.icon('refresh') }} Show them</a></p>
+  </div>
+
+  <section class="card" aria-label="Student accounts">
+    <div class="filters">
+      <div class="search field">
+        <label for="acc-search" class="sr-only">Search accounts</label>
+        {{ ui.icon('search') }}
+        <input id="acc-search" type="search" placeholder="Search name, Voter ID, student number, course or section" autocomplete="off">
+      </div>
+      <div class="segmented" role="group" aria-label="Filter by account status">
+        <button type="button" data-acc-filter="pending" aria-pressed="{{ 'true' if acc_counts.pending else 'false' }}">Pending <span class="seg-count" data-a="count-pending">{{ acc_counts.pending }}</span></button>
+        <button type="button" data-acc-filter="verified" aria-pressed="false">Verified <span class="seg-count" data-a="count-verified">{{ acc_counts.verified }}</span></button>
+        <button type="button" data-acc-filter="rejected" aria-pressed="false">Rejected <span class="seg-count" data-a="count-rejected">{{ acc_counts.rejected }}</span></button>
+        <button type="button" data-acc-filter="all" aria-pressed="{{ 'false' if acc_counts.pending else 'true' }}">All</button>
+      </div>
+    </div>
+    <p class="hint" id="acc-count" aria-live="polite"></p>
+
+    <form method="post" action="{{ url_for('admin_verify_accounts') }}" id="acc-form" data-busy="Saving...">
+      {{ ui.csrf() }}{{ tab('accounts') }}
+      <div class="register-bar">
+        <label class="check-all"><input type="checkbox" id="acc-check-all" aria-controls="acc-rows"> Select all pending shown</label>
+        <span class="hint" id="acc-checked" aria-live="polite">0 selected</span>
+        <button class="btn btn-success btn-sm" type="submit" data-acc-needs-selection data-disabled-reason="Select at least one account first">{{ ui.icon('check') }} Approve selected</button>
+        <button class="btn btn-danger-outline btn-sm" type="button" data-acc-reject-selected data-acc-needs-selection data-disabled-reason="Select at least one account first">{{ ui.icon('x') }} Reject selected</button>
+        <button class="btn btn-success btn-sm" type="submit" name="all" value="1" id="acc-approve-all" {% if not acc_counts.pending %}disabled{% endif %} data-disabled-reason="No accounts are waiting"
+                data-confirm-click="Approve all {{ acc_counts.pending }} pending accounts?"
+                data-confirm-text="These students can then register for voting events.">{{ ui.icon('users') }} Approve all pending</button>
+      </div>
+      <div class="table-wrap students-scroll">
+        <table class="table student-table reg-table">
+          <thead><tr><th scope="col"><span class="sr-only">Select</span></th><th scope="col">Name</th><th scope="col">Voter ID</th>
+            <th scope="col">Student no.</th><th scope="col">Course</th><th scope="col">Department</th><th scope="col">Yr-Sec</th>
+            <th scope="col">Created</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+          <tbody id="acc-rows">
+            {% for a in accounts %}{{ rows.acc_row(a) }}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </form>
+    <p class="empty" id="acc-empty" {% if accounts %}hidden{% endif %}>{{ ui.icon('inbox') }}<span data-a="empty-text">{% if accounts %}No accounts match.{% else %}No student accounts yet. Students create them on the login page ("Create account").{% endif %}</span></p>
+  </section>
+
+  <div class="modal" id="acc-reject-modal" role="dialog" aria-modal="true" aria-labelledby="acc-reject-title" hidden>
+    <div class="modal-panel">
+      <h2 id="acc-reject-title">Reject account</h2>
+      <p class="muted" data-a="reject-who"></p>
+      <form method="post" action="{{ url_for('admin_reject_accounts') }}" class="stack" id="acc-reject-form" data-busy="Rejecting...">
+        {{ ui.csrf() }}{{ tab('accounts') }}
+        <div data-a="reject-ids"></div>
+        <div class="field">
+          <label for="acc-reject-reason">Reason (the student sees this)</label>
+          <textarea id="acc-reject-reason" name="reason" required maxlength="200" rows="3" data-autofocus
+                    placeholder="e.g. Student number not found in the class list. Please see COMELEC."></textarea>
+        </div>
+        <div class="reason-chips" aria-label="Common reasons">
+          {% for reason in ['Student number not found in the class list.', 'Name does not match school records.', 'Not enrolled in this school.', 'Duplicate account.'] %}
+          <button type="button" class="chip" data-acc-reason="{{ reason }}">{{ reason }}</button>
+          {% endfor %}
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn" data-close-modal>{{ ui.icon('back') }} Cancel</button>
+          <button type="submit" class="btn btn-danger">{{ ui.icon('x') }} Reject</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+{# =============================== REGISTRATIONS =============================== #}
+<section class="tab-panel" id="panel-registrations" role="tabpanel" aria-labelledby="tab-registrations"
+         data-registrations="{{ url_for('admin_api_registrations', event=ev.id) }}" data-latest="{{ reg_counts.latest_id }}">
+  {{ to_overview() }}
+  <div class="section-title">
+    <h2>Registrations</h2>
+    <span class="live" data-r="live"><span class="dot" aria-hidden="true"></span><span>Auto-refresh</span></span>
+  </div>
+  <p class="muted small reg-intro">Logged-in students with a verified account register for this event with one tap.
+    {% if ev.auto_approve %}<b>Auto-approve is ON</b> for this event: those registrations are approved at once and only
+    re-registrations after a rejection wait here.{% else %}<b>Auto-approve is OFF</b> for this event: every registration waits here for you.{% endif %}
+    Change it in Settings. The class-list upload in the Students tab still works too.</p>
+
+  <div class="new-regs alert alert-info" id="new-regs" role="status" hidden>{{ ui.icon('users') }}
+    <p><strong data-r="new-text">New registrations came in.</strong>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('admin', event=ev.id) }}#registrations" data-r="reload">{{ ui.icon('refresh') }} Show them</a></p>
+  </div>
+
+  <section class="card" aria-label="Registration requests">
+    <div class="filters">
+      <div class="search field">
+        <label for="reg-search" class="sr-only">Search registrations</label>
+        {{ ui.icon('search') }}
+        <input id="reg-search" type="search" placeholder="Search name, student number, course or section" autocomplete="off">
+      </div>
+      <div class="segmented" role="group" aria-label="Filter by status">
+        <button type="button" data-reg-filter="pending" aria-pressed="{{ 'true' if reg_counts.pending else 'false' }}">Pending <span class="seg-count" data-r="count-pending">{{ reg_counts.pending }}</span></button>
+        <button type="button" data-reg-filter="approved" aria-pressed="false">Approved <span class="seg-count" data-r="count-approved">{{ reg_counts.approved }}</span></button>
+        <button type="button" data-reg-filter="rejected" aria-pressed="false">Rejected <span class="seg-count" data-r="count-rejected">{{ reg_counts.rejected }}</span></button>
+        <button type="button" data-reg-filter="all" aria-pressed="{{ 'false' if reg_counts.pending else 'true' }}">All</button>
+      </div>
+    </div>
+    <p class="hint" id="reg-count" aria-live="polite"></p>
+
+    <form method="post" action="{{ url_for('admin_approve_registrations') }}" id="reg-form" data-busy="Saving...">
+      {{ ui.csrf() }}{{ tab('registrations') }}
+      <div class="register-bar">
+        <label class="check-all"><input type="checkbox" id="reg-check-all" aria-controls="reg-rows"> Select all pending shown</label>
+        <span class="hint" id="reg-checked" aria-live="polite">0 selected</span>
+        <button class="btn btn-success btn-sm" type="submit" data-needs-selection data-disabled-reason="Select at least one row first">{{ ui.icon('check') }} Approve selected</button>
+        <button class="btn btn-danger-outline btn-sm" type="button" data-reject-selected data-needs-selection data-disabled-reason="Select at least one row first">{{ ui.icon('x') }} Reject selected</button>
+        <button class="btn btn-success btn-sm" type="submit" name="all" value="1" id="approve-all" {% if not reg_counts.pending %}disabled{% endif %} data-disabled-reason="No pending registrations"
+                data-confirm-click="Approve all {{ reg_counts.pending }} pending registrations?"
+                data-confirm-text="Every pending student is added to {{ ev.name }}. New students get a Voter ID.">{{ ui.icon('users') }} Approve all pending</button>
+      </div>
+      <div class="table-wrap students-scroll">
+        <table class="table student-table reg-table">
+          <thead><tr><th scope="col"><span class="sr-only">Select</span></th><th scope="col">Name</th><th scope="col">Student no.</th>
+            <th scope="col">Course</th><th scope="col">Department</th><th scope="col">Yr-Sec</th><th scope="col">Submitted</th>
+            <th scope="col">Status</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+          <tbody id="reg-rows">
+            {% for r in registrations %}{{ rows.reg_row(r) }}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </form>
+    <p class="empty" id="reg-empty" {% if registrations %}hidden{% endif %}>{{ ui.icon('inbox') }}<span data-r="empty-text">{% if registrations %}No registrations match.{% else %}No registrations yet. Share the event's "Register to vote" link with your classmates.{% endif %}</span></p>
+  </section>
+
+  {# Reject with a reason (the student sees it on the status page and when logging in). #}
+  <div class="modal" id="reject-modal" role="dialog" aria-modal="true" aria-labelledby="reject-title" hidden>
+    <div class="modal-panel">
+      <h2 id="reject-title">Reject registration</h2>
+      <p class="muted" data-r="reject-who"></p>
+      <form method="post" action="{{ url_for('admin_reject_registrations') }}" class="stack" id="reject-form" data-busy="Rejecting...">
+        {{ ui.csrf() }}{{ tab('registrations') }}
+        <div data-r="reject-ids"></div>
+        <div class="field">
+          <label for="reject-reason">Reason (the student sees this)</label>
+          <textarea id="reject-reason" name="reason" required maxlength="200" rows="3" data-autofocus
+                    placeholder="e.g. Student number not found in the class list. Please check it and register again."></textarea>
+        </div>
+        <div class="reason-chips" aria-label="Common reasons">
+          {% for reason in ['Student number not found in the class list.', 'Name does not match school records.', 'Not enrolled in this college/department.', 'Duplicate registration.'] %}
+          <button type="button" class="chip" data-reason="{{ reason }}">{{ reason }}</button>
+          {% endfor %}
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn" data-close-modal>{{ ui.icon('back') }} Cancel</button>
+          <button type="submit" class="btn btn-danger">{{ ui.icon('x') }} Reject</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+{# =============================== RESULTS =============================== #}
+<section class="tab-panel" id="panel-results" role="tabpanel" aria-labelledby="tab-results">
+  {{ to_overview() }}
+  {% set in_admin = true %}
+  {% include "_results.html" %}
+</section>
+
+{# =============================== SETTINGS =============================== #}
+<section class="tab-panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings">
+  {{ to_overview() }}
+  <div class="section-title"><h2>Settings</h2></div>
+  <div class="panel-grid">
+    <section class="card" style="grid-column:1/-1">
+      <div class="card-head"><h2>{{ ui.icon('edit') }} Event details</h2>{{ ui.status_badge(ev) }}</div>
+      <form method="post" action="{{ url_for('admin_event_save') }}" class="event-edit-form" data-busy="Saving...">
+        {{ ui.csrf() }}{{ tab('settings') }}
+        {% set e = ev %}{% set pfx = 'ev' %}{% set submit_label = 'Save changes' %}{% set cancel = 'reset' %}
+        {% include "_event_form.html" %}
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>{{ ui.icon('ballot') }} Voting</h2>
+        {% if election.is_open %}<span class="badge badge-open"><span class="dot" aria-hidden="true"></span> Open</span>{% else %}<span class="badge badge-closed">Closed</span>{% endif %}</div>
+      <p class="muted small">{% if ev.manual == 'auto' %}Follows the schedule: {{ ev.status_label|lower }} right now.{% else %}Set by hand: {{ 'open' if ev.manual == 'open' else 'closed' }}.{% endif %}
+        Several events can be open at the same time.</p>
+      <div class="actions-row">
+        {{ toggle_form('settings') }}
+        {% if ev.manual != 'auto' %}
+        <form method="post" action="{{ url_for('admin_toggle') }}" data-busy="Saving...">
+          {{ ui.csrf() }}{{ tab('settings') }}<input type="hidden" name="mode" value="auto">
+          <button class="btn" type="submit">{{ ui.icon('clock') }} Follow the schedule</button>
+        </form>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>{{ ui.icon('lock') }} Student passwords</h2>
+        {% if election.require_password_change %}<span class="badge badge-open">On</span>{% else %}<span class="badge">Off</span>{% endif %}</div>
+      <p class="muted small"><b>Require students to change password on first login.</b>
+        When on, a student who still uses the password from their slip must choose their own password before
+        they can see the ballot. Off by default (keep it off for load tests).</p>
+      <form method="post" action="{{ url_for('admin_password_rule') }}" data-busy="Saving...">
+        {{ ui.csrf() }}{{ tab('settings') }}
+        <button class="btn" type="submit">{{ 'Turn off' if election.require_password_change else 'Turn on' }}</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>{{ ui.icon('lock') }} Admin session</h2></div>
+      <p class="muted small">Log out when you're done, especially on a shared computer.</p>
+      <a class="btn" href="{{ url_for('logout') }}">{{ ui.icon('logout') }} Log out</a>
+    </section>
+
+    <section class="card danger-zone" style="grid-column:1/-1">
+      <div class="card-head"><h2>{{ ui.icon('alert') }} Danger zone: Reset votes of {{ ev.name }}</h2></div>
+      <p class="muted small">Deletes <b>all ballots and votes of this event</b> so you can rehearse again. Other events, student accounts, registrations and candidates stay.
+        Use this only after a rehearsal, never during the real election. This can't be undone.</p>
+      <form method="post" action="{{ url_for('admin_reset') }}" class="row" id="reset-form" data-danger
+            data-confirm="Delete ALL votes?" data-confirm-text="Every ballot ({{ overview.ballots }} right now) will be permanently deleted." data-confirm-ok="Yes, reset votes">
+        {{ ui.csrf() }}{{ tab('settings') }}
+        <div class="field grow"><label for="reset-confirm">Type RESET to confirm</label>
+          <input id="reset-confirm" name="confirm" required autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="RESET"></div>
+        <button class="btn btn-danger" type="submit" id="reset-btn">{{ ui.icon('trash') }} Reset votes</button>
+      </form>
+    </section>
+
+    <section class="card danger-zone" style="grid-column:1/-1">
+      <div class="card-head"><h2>{{ ui.icon('trash') }} Danger zone: Delete this event</h2></div>
+      <p class="muted small">Deletes <b>{{ ev.name }}</b> with its positions, candidates, voter registrations and
+        <b>{{ ev.ballots }} ballots</b>. Student accounts are kept. This can't be undone.</p>
+      <form method="post" action="{{ url_for('admin_event_delete') }}" class="row" data-danger
+            data-confirm="Delete {{ ev.name }}?" data-confirm-text="The event and its {{ ev.ballots }} ballots will be permanently deleted." data-confirm-ok="Yes, delete event">
+        {{ ui.csrf() }}{{ tab('settings') }}
+        <div class="field grow"><label for="delete-confirm">Type DELETE to confirm</label>
+          <input id="delete-confirm" name="confirm" required autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DELETE"></div>
+        <button class="btn btn-danger" type="submit">{{ ui.icon('trash') }} Delete event</button>
+      </form>
+    </section>
+  </div>
+</section>
+    </div>{# /admin-body #}
+  </div>{# /admin-main #}
+</div>{# /admin-shell #}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ asset('results.js') }}" defer></script>
+<script src="{{ asset('admin.js') }}" defer></script>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}BotoKo · Log in{% endblock %}
+{% block main_class %}center login-first{% endblock %}
+{# THE FIRST PAGE: everyone logs in here (students with their Voter ID; the COMELEC admin too).
+   next = the page to go back to after logging in. #}
+{% block flashes %}
+<div class="toasts" id="toasts" aria-live="polite">
+  {% for msg in get_flashed_messages(category_filter=['relogin']) %}
+  <div class="toast toast-info" role="status">{{ ui.icon('lock') }}<span class="toast-msg">{{ msg }}</span>
+    <button type="button" class="btn btn-ghost btn-icon toast-close" aria-label="Dismiss">{{ ui.icon('x') }}</button></div>
+  {% endfor %}
+  {% for msg in get_flashed_messages(category_filter=['error']) %}
+  <div class="toast toast-error" role="alert">{{ ui.icon('alert') }}<span class="toast-msg">{{ msg }}</span>
+    <button type="button" class="btn btn-ghost btn-icon toast-close" aria-label="Dismiss">{{ ui.icon('x') }}</button></div>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block content %}
+{% set errors = get_flashed_messages(category_filter=['error']) %}
+{% set notes = get_flashed_messages(category_filter=['ok', 'info']) %}
+<div class="auth">
+  <div class="auth-brand">
+    {{ ui.logo(132) }}
+    <h1 class="brand-title">Boto<b>Ko</b></h1>
+    <p class="tagline">Ang boto mo, boses mo. · Student council elections</p>
+  </div>
+  {% if already %}
+  {# The login form was sent with an old token while someone is logged in in this browser (another tab). #}
+  <section class="card already-in" aria-labelledby="already-title" role="status">
+    <h2 id="already-title" class="already-title">{{ ui.icon('users') }} You're already logged in as {{ already.label }} in this browser.</h2>
+    <p class="muted small">Continue or log out. (Another tab of this browser logged in. One browser = one login.)</p>
+    <div class="already-actions">
+      <a class="btn btn-primary" href="{{ already.continue_url }}">{{ ui.icon('arrow') }} Continue{{ ' to the dashboard' if already.is_admin else '' }}</a>
+      <form method="post" action="{{ url_for('logout') }}" data-logout-form>{{ ui.csrf() }}
+        <button type="submit" class="btn">{{ ui.icon('logout') }} Log out</button></form>
+    </div>
+  </section>
+  {% endif %}
+  <section class="card" aria-labelledby="login-heading">
+    <h2 id="login-heading" class="login-heading">Log in</h2>
+    <form method="post" action="{{ url_for('login') }}" class="stack" autocomplete="off" data-busy="Logging in..." data-no-autofill>
+      {{ ui.csrf() }}
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+      {% for msg in notes %}
+      <div class="alert alert-ok" role="status">{{ ui.icon('check') }}<p>{{ msg }}</p></div>
+      {% endfor %}
+      {% if next and not errors %}<p class="hint">{{ ui.icon('lock') }} Please log in to continue.</p>{% endif %}
+      {% for msg in errors %}<p class="sr-only" id="login-error">{{ msg }}</p>{% endfor %}
+      <div class="field float">
+        <label for="student_no">Voter ID</label>
+        <input id="student_no" name="student_no" required value="{{ student_no }}"
+               autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text"
+               placeholder="e.g. {{ VOTER_ID_EXAMPLE }}" autocomplete="off"
+               aria-describedby="voter-id-hint{% if errors %} login-error{% endif %}"
+               {% if errors %}aria-invalid="true"{% else %}autofocus{% endif %}>
+        <p class="hint" id="voter-id-hint">You got your Voter ID when you created your account. It is not your school student number.</p>
+      </div>
+      <div class="field float">
+        <label for="password">Password</label>
+        <div class="password-wrap">
+          <input id="password" name="password" type="password" required autocapitalize="none" autocomplete="new-password"
+                 autocorrect="off" spellcheck="false" {% if errors %}aria-invalid="true" autofocus{% endif %}>
+          <button type="button" class="password-toggle" data-toggle-password aria-controls="password"
+                  aria-pressed="false" aria-label="Show password" hidden>{{ ui.icon('eye') }}<span class="pw-label">Show</span></button>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-lg btn-block" type="submit"><span>Log in</span>{{ ui.icon('arrow') }}</button>
+    </form>
+  </section>
+  <ul class="signin-links">
+    <li>Don't have an account? <a href="{{ url_for('create_account_page') }}" class="link-register">Create account</a></li>
+    <li><a href="{{ url_for('forgot_voter_id') }}" class="link-status">Forgot your Voter ID?</a></li>
+  </ul>
+  <p class="auth-foot">{{ ui.icon('lock') }} Forgot your password? Ask your COMELEC officer.</p>
+</div>
+{% endblock %}

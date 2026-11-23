@@ -1,0 +1,44 @@
+BotoKo from anywhere (other networks, mobile data) with a Cloudflare quick tunnel
+================================================================================
+The app keeps running on this laptop. "cloudflared" gives it a temporary public HTTPS address
+(https://<random words>.trycloudflare.com) that forwards to http://127.0.0.1:5000. Anyone with the address
+can open BotoKo: share it only with the voters. The address CHANGES every time the tunnel is started.
+
+1. START THE APP (window 1)
+   PowerShell, in C:\Users\cathyrine\Downloads\botoko\botoko:
+       .\run-local.ps1
+   It starts the database and BotoKo at http://localhost:5000 (database botoko_live). Keep this window open.
+
+2. START THE TUNNEL (window 2)
+   Open a second PowerShell window and run:
+       & "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --no-autoupdate --url http://127.0.0.1:5000
+   After a few seconds it prints a box with the address, e.g.
+       https://some-random-words.trycloudflare.com
+   Wait about 10-30 seconds, open that address on your phone (mobile data) to check, then share it.
+   Use 127.0.0.1 (not "localhost") in the command: BotoKo listens on IPv4, and "localhost" can mean IPv6 (::1).
+   Keep this window open: closing it ends the tunnel.
+
+   On this laptop and on the same Wi-Fi the old addresses still work, exactly as before:
+       http://localhost:5000      http://<laptop IP>:5000
+
+3. STOP THE TUNNEL
+   Click on the tunnel window and press Ctrl+C (or close the window). The public address stops working at once.
+   BotoKo itself keeps running for this laptop / the Wi-Fi. Stop BotoKo with Ctrl+C in window 1.
+
+4. IF THE ADDRESS STOPS WORKING
+   - Is BotoKo still running? Open http://localhost:5000 on the laptop. If not: start it again (step 1).
+   - Is the tunnel window still open, without errors? If it closed or shows repeated errors: press Ctrl+C,
+     start it again (step 2) and share the NEW address (quick tunnels get a new random address every start).
+   - Laptop asleep or lost internet? Keep it plugged in, turn sleep off for the defense, check the Wi-Fi /
+     hotspot, then restart the tunnel.
+   - "Error 1033" / "530" in the browser = the tunnel isn't connected: restart the tunnel (step 2).
+   - Quick tunnels are for testing / demos: no uptime guarantee and at most about 200 requests at the same time.
+
+HOW BOTOKO HANDLES THE TUNNEL (already set up, nothing to do)
+   - The tunnel connects to the app from 127.0.0.1. Only for those requests BotoKo trusts the proxy headers, for
+     exactly one hop (serve.py: Waitress trusted_proxy=127.0.0.1; app.py: ProxyFix for the simple "py app.py" mode):
+     the real visitor IP is used for the rate limits and the admin lockout, and links / QR codes use https://.
+   - Visitors on the Wi-Fi (http://<laptop IP>:5000) can't fake their IP: their X-Forwarded-* headers are removed.
+   - The login cookie is "Secure" on https (through the tunnel) and a normal cookie on plain http (local), so both work.
+   - Login, CSRF protection, voting, receipts (PNG/JPG), live results, approvals, End voting now and publishing all
+     work through the tunnel (tested 2026-11-19 on the test database: tests\tunnel_test.py, 18/18).

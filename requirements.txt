@@ -1,0 +1,8 @@
+Flask>=3.0,<4
+psycopg[binary]>=3.2,<4
+psycopg-pool>=3.2,<4
+gunicorn>=22,<24
+psutil>=5.9,<8          # counts the physical CPU cores (1 worker process per core)
+segno>=1.5,<2
+waitress>=3.0,<4; sys_platform == "win32"   # Windows only: multi-process local server (serve.py)
+Pillow>=10,<13     # the voting receipt as a PNG / JPG image (receipt_image.py)

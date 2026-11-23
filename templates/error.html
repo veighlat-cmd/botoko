@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ title }} · BotoKo{% endblock %}
+{% block main_class %}center{% endblock %}
+{% block content %}
+{# kind: expired | busy | notfound | generic (set by the error handlers in app.py) #}
+{% set icons = {'expired': ('clock', 'warn'), 'busy': ('server', 'warn'), 'notfound': ('compass', ''), 'generic': ('alert', 'bad')} %}
+{% set ico, tone = icons.get(kind, icons['generic']) %}
+<section class="card state" style="max-width:440px;margin:0 auto;width:100%">
+  <div class="hero-icon {{ tone }}">{{ ui.icon(ico) }}</div>
+  <h1>{{ title }}</h1>
+  <p class="muted">{{ message }}</p>
+  {# "Home" (/) re-checks everything: a student whose vote went through lands on their receipt. #}
+  <div class="actions">
+    {% if kind == 'busy' %}
+      <a class="btn btn-primary" href="{{ url_for('index') }}">{{ ui.icon('refresh') }} Try again from Home</a>
+    {% elif kind == 'expired' %}
+      <a class="btn btn-primary" href="{{ url_for('index') }}">{{ ui.icon('home') }} Start again from Home</a>
+    {% else %}
+      <a class="btn btn-primary" href="{{ url_for('index') }}">{{ ui.icon('home') }} Home</a>
+    {% endif %}
+    <a class="btn" href="{{ url_for('index') }}" data-back>{{ ui.icon('back') }} Go back</a>
+  </div>
+</section>
+{% endblock %}

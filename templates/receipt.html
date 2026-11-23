@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Vote receipt · BotoKo{% endblock %}
+{# A second submit (or opening the ballot again) is shown as a banner above the receipt. #}
+{% block flashes %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+<div class="toasts" id="toasts" aria-live="polite">
+  {% for cat, msg in messages if cat != 'already' %}
+  <div class="toast toast-{{ cat }}" role="status">{{ ui.icon('alert') }}<span class="toast-msg">{{ msg }}</span>
+    <button type="button" class="btn btn-ghost btn-icon toast-close" aria-label="Dismiss">{{ ui.icon('x') }}</button></div>
+  {% endfor %}
+</div>
+{% set repeat = messages|selectattr(0, 'equalto', 'already')|map(attribute=1)|list %}
+{% if repeat %}
+<div class="page page-banner">
+  <div class="alert alert-warn" role="alert">{{ ui.icon('info') }}
+    <p><strong>{{ repeat[0] }}</strong>Each student can vote only once. Your first ballot is the one that counts, shown below.</p>
+  </div>
+</div>
+{% endif %}
+{% endwith %}
+{% endblock %}
+{% block scripts %}
+{# The vote is recorded: forget the choices the ballot page kept in this tab. #}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    BotoKo.forgetBallot();
+    // Print / Save as PDF both use the browser's print window (only the receipt is printed).
+    document.querySelectorAll('[data-print]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (b.hasAttribute('data-pdf')) document.getElementById('pdf-hint').hidden = false;
+        window.print();
+      });
+    });
+
+    /* Download receipt (PNG / JPG). The server draws the image; phones get the share sheet
+       (Web Share API with files) when they have one, everything else a normal download. */
+    var menu = document.querySelector('[data-dl-menu]');
+    if (!menu) return;
+    var toggle = menu.querySelector('summary');
+    menu.addEventListener('toggle', function () { toggle.setAttribute('aria-expanded', String(menu.open)); });
+    document.addEventListener('click', function (e) { if (menu.open && !menu.contains(e.target)) menu.open = false; });
+    menu.addEventListener('keydown', function (e) { if (e.key === 'Escape' && menu.open) { menu.open = false; toggle.focus(); } });
+    function saveFile(blob, name) {
+      var url = URL.createObjectURL(blob), a = document.createElement('a');
+      a.href = url; a.download = name; a.hidden = true;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+      return true;
+    }
+    menu.querySelectorAll('[data-dl]').forEach(function (link) {
+      link.addEventListener('click', function (e) {
+        if (!window.fetch || !window.Blob || !window.URL) return;             // old browser: plain download
+        e.preventDefault();
+        if (toggle.classList.contains('is-loading')) return;
+        menu.open = false;
+        var name = link.getAttribute('download');
+        BotoKo.setBusy(toggle, 'Creating image...');
+        fetch(link.href, { credentials: 'same-origin', cache: 'no-store' })
+          .then(function (r) {
+            if (!r.ok) throw new Error(r.status === 403 ? 'Please log in again to download your receipt.' : 'HTTP ' + r.status);
+            return r.blob();
+          })
+          .then(function (blob) {
+            var phone = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+            var file = typeof File === 'function' ? new File([blob], name, { type: blob.type }) : null;
+            if (phone && file && navigator.canShare && navigator.canShare({ files: [file] })) {
+              return navigator.share({ files: [file], title: 'BotoKo voting receipt' }).then(function () { return true; },
+                function (err) { return err && err.name === 'AbortError' ? false : saveFile(blob, name); });
+            }
+            return saveFile(blob, name);
+          })
+          .then(function (done) {
+            BotoKo.clearBusy(toggle);
+            if (done) BotoKo.toast('Receipt saved', 'ok');
+          })
+          .catch(function (err) {
+            BotoKo.clearBusy(toggle);
+            BotoKo.toast(/log in/.test(err.message) ? err.message : 'Could not create the receipt image. Please try again.', 'error');
+          });
+      });
+    });
+  });
+</script>
+{% endblock %}
+{% block content %}
+<div class="receipt-page">
+  {# ---- On screen only: confirmation (loadtest.py looks for "Your vote was recorded") ---- #}
+  <section class="receipt-status no-print">
+    <div class="success-mark" aria-hidden="true">{{ ui.icon('check') }}</div>
+    <h1>Your vote was recorded</h1>
+    {{ ui.voter_line(g.student) }}
+    <p class="muted">Salamat sa pagboto! Here is your official voting receipt.</p>
+  </section>
+
+  {# =====================================================================
+     OFFICIAL VOTING RECEIPT (this is the part that prints).
+     Each block below is one section of the paper receipt, top to bottom,
+     so it is easy to rearrange to match a real receipt sample.
+     Width and fonts: see "Official voting receipt" in static/style.css.
+     ===================================================================== #}
+  <article class="paper" id="receipt" aria-labelledby="paper-banner">
+    {# 1. Header #}
+    <header class="paper-head">
+      {{ ui.logo(56) }}
+      {% if election.school_name %}<p class="paper-school">{{ election.school_name }}</p>{% endif %}
+      <p class="paper-sub">Student Council Election</p>
+      <p class="paper-title">{{ election.title }}</p>
+      <p class="paper-sy">School Year {{ election.school_year }}</p>
+    </header>
+
+    {# 2. Title #}
+    <p class="paper-banner" id="paper-banner">OFFICIAL VOTING RECEIPT</p>
+
+    {# 3. Receipt details #}
+    <dl class="paper-meta">
+      <div><dt>Receipt / Ballot No.</dt><dd>{{ ballot_no }}</dd></div>
+      {# Keep exactly class="code">CODE< : loadtest.py reads the verification code with that pattern. #}
+      <div><dt>Verification code</dt><dd><span id="receipt-code" class="code">{{ code }}</span></dd></div>
+      <div><dt>Date &amp; time voted</dt><dd>{{ cast_at }}<br><small>Philippine time (Asia/Manila)</small></dd></div>
+      <div><dt>Voter ID</dt><dd>{{ masked_voter_id }}</dd></div>
+    </dl>
+
+    {# 4. Votes cast #}
+    <p class="paper-section">VOTES CAST</p>
+    <ol class="paper-votes">
+      {% for p in picks %}
+      <li class="{{ '' if p.chosen else 'pv-none' }}">
+        <span class="pv-pos">{{ p.position }}{% if p.seats > 1 %} (vote up to {{ p.seats }}){% endif %}</span>
+        {% for c in p.chosen %}
+        <span class="pv-name">{{ c.name }}{% if c.party %} <small>({{ c.party }})</small>{% endif %}</span>
+        {% else %}
+        <span class="pv-name">NO VOTE</span>
+        {% endfor %}
+      </li>
+      {% endfor %}
+    </ol>
+
+    {# 5. Totals #}
+    <dl class="paper-totals">
+      <div><dt>Positions voted</dt><dd>{{ n_voted }}</dd></div>
+      <div><dt>Positions skipped</dt><dd>{{ picks|length - n_voted }}</dd></div>
+      <div><dt>Total positions</dt><dd>{{ picks|length }}</dd></div>
+    </dl>
+
+    {# 6. QR code with the verification link #}
+    <div class="paper-qr">
+      {{ qr|safe }}
+      <p>Scan to verify, or open<br><b>{{ url_for('verify', _external=True) }}</b><br>and enter the verification code.</p>
+    </div>
+
+    {# 7. Processing details (proof of parallel processing) #}
+    <p class="paper-server">Processed by server worker PID {{ worker_pid }} · {{ thread_name.replace(' (process_request_thread)', '') }}</p>
+
+    {# 8. Footer #}
+    <footer class="paper-foot">Thank you for voting.<br>Keep this receipt for verification.</footer>
+  </article>
+
+  {# ---- On screen only: actions ---- #}
+  <div class="receipt-actions no-print">
+    <button type="button" class="btn btn-primary" data-print>{{ ui.icon('download') }} Print receipt</button>
+    <button type="button" class="btn" data-print data-pdf>{{ ui.icon('copy') }} Save as PDF</button>
+    {# The receipt as an image, drawn on the server (works the same on every phone, also offline).
+       Without JavaScript the two links simply download the file. #}
+    <details class="dl-menu" data-dl-menu>
+      <summary class="btn" aria-haspopup="menu">{{ ui.icon('image') }}<span>Download receipt</span>{{ ui.icon('down', 'dl-caret') }}</summary>
+      <div class="dl-list" role="menu" aria-label="Download receipt as">
+        <a role="menuitem" href="{{ url_for('receipt_download', code=code, fmt='png') }}" download="{{ dl_name }}.png" data-dl>{{ ui.icon('image') }}<span>Download as PNG</span></a>
+        <a role="menuitem" href="{{ url_for('receipt_download', code=code, fmt='jpg') }}" download="{{ dl_name }}.jpg" data-dl>{{ ui.icon('image') }}<span>Download as JPG</span></a>
+      </div>
+    </details>
+    <a class="btn" href="{{ url_for('index') }}">{{ ui.icon('home') }} All events</a>
+    <a class="btn btn-ghost" href="{{ url_for('event_results', event_id=ev.id) }}">{{ ui.icon('chart') }} See {{ 'live ' if ev.status == 'current' }}results</a>
+  </div>
+  {% if other_events %}
+  {# Registered in other open events: switch without logging in again #}
+  <section class="card other-events no-print">
+    <h2 class="eyebrow">You can also vote in</h2>
+    {% for o in other_events %}
+    <a class="other-event" href="{{ url_for('event_ballot', event_id=o.id) }}">
+      <span><b>{{ o.name }}</b><span class="muted small">{{ 'You already voted here' if o.has_voted else 'Ends ' ~ (o.ends_txt or 'when COMELEC closes it') }}</span></span>
+      <span class="btn btn-sm {{ '' if o.has_voted else 'btn-primary' }}">{{ 'Receipt' if o.has_voted else 'Vote' }}</span>
+    </a>
+    {% endfor %}
+  </section>
+  {% endif %}
+  <p class="hint no-print" id="pdf-hint" hidden>To save as PDF: in the print window, choose <b>"Save as PDF"</b> (or "Microsoft Print to PDF") as the printer.</p>
+</div>
+{% endblock %}

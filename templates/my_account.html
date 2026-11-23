@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}My Account · BotoKo{% endblock %}
+{% block main_class %}account-page{% endblock %}
+{# My Account. A PENDING (or rejected) account sees only its status + profile. A verified account also
+   sees: Vote now, my registrations, vote history with receipts, register for another event. #}
+{% block content %}
+<div class="account-head">
+  <div class="account-who">
+    <span class="avatar lg tone-{{ s.full_name|tone }}" aria-hidden="true">{{ s.full_name|initials }}</span>
+    <div>
+      <p class="eyebrow">My Account</p>
+      <h1>{{ s.full_name }}</h1>
+      <p class="muted small mono">{{ s.student_no }}</p>
+    </div>
+  </div>
+  <div class="account-actions">
+    <a class="btn" href="{{ url_for('account_password') }}">{{ ui.icon('lock') }} Change password</a>
+    <a class="btn btn-ghost" href="{{ url_for('logout') }}" data-confirm-link="Log out of your account?">{{ ui.icon('logout') }} Log out</a>
+  </div>
+</div>
+
+{% if s.account_status == 'pending' %}
+{# The page checks the account status by itself every few seconds (script below): as soon as COMELEC verifies
+   the account, it says so and opens the event list; if the account is rejected, it shows the reason. #}
+<div class="alert alert-info account-status-msg" role="status" data-account-wait="{{ url_for('account_status_json') }}">{{ ui.icon('clock') }}
+  <p><strong>Your account is waiting for verification by the election committee.</strong>
+    You can register for voting events and vote as soon as COMELEC verifies your account. This page updates by itself.</p></div>
+{% elif s.account_status == 'rejected' %}
+<div class="alert alert-error account-status-msg" role="alert">{{ ui.icon('alert') }}
+  <p><strong>Your account was rejected: {{ s.account_reason or 'no reason given' }}</strong>
+    Please talk to your COMELEC officer to fix your details.</p></div>
+{% endif %}
+
+{# ---- Vote now ---- #}
+{% if verified and vote_now %}
+<section class="account-section" aria-labelledby="vote-now-title">
+  <h2 id="vote-now-title" class="section-h">{{ ui.icon('ballot') }} Vote now</h2>
+  <div class="vote-now-list">
+    {% for r in vote_now %}
+    <a class="card vote-now-card" href="{{ url_for('event_ballot', event_id=r.event_id) }}">
+      <span class="vote-now-text"><span class="badge status-current"><span class="dot" aria-hidden="true"></span>Current</span>
+        <b>{{ r.event }}</b><span class="muted small">{% if r.ends_txt %}Voting ends {{ r.ends_txt }}{% else %}Open now{% endif %}</span></span>
+      <span class="btn btn-primary">{{ ui.icon('ballot') }} Vote now</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<div class="account-grid">
+  {# ---- Profile ---- #}
+  <section class="card" aria-labelledby="profile-title">
+    <div class="card-head"><h2 id="profile-title">{{ ui.icon('users') }} Profile</h2>
+      {% if s.account_status == 'verified' %}{{ ui.reg_badge('approved', 'Verified') }}{% elif s.account_status == 'pending' %}{{ ui.reg_badge('pending', 'Pending verification') }}{% else %}{{ ui.reg_badge('rejected', 'Rejected') }}{% endif %}</div>
+    <dl class="facts facts-compact">
+      <div><dt>Voter ID</dt><dd class="mono" id="my-voter-id">{{ s.student_no }}</dd></div>
+      <div><dt>Student number</dt><dd class="mono">{{ s.school_student_no or 'Not set' }}</dd></div>
+      <div class="wide"><dt>Name</dt><dd>{{ s.full_name }}</dd></div>
+      <div><dt>Course</dt><dd>{{ s.course or 'Not set' }}</dd></div>
+      <div><dt>Year and section</dt><dd>{% if s.year_level %}{{ s.year_level }}-{{ s.section }}{% else %}Not set{% endif %}</dd></div>
+      <div class="wide"><dt>School / department</dt><dd>{{ s.department or 'Not set' }}</dd></div>
+      {% if s.email %}<div class="wide"><dt>Email</dt><dd>{{ s.email }}</dd></div>{% endif %}
+    </dl>
+    <p class="hint">To correct your details, please contact COMELEC.</p>
+  </section>
+
+  {% if verified %}
+  {# ---- My registrations ---- #}
+  <section class="card" aria-labelledby="regs-title">
+    <div class="card-head"><h2 id="regs-title">{{ ui.icon('inbox') }} My registrations</h2></div>
+    {% if regs %}
+    <ul class="reg-list">
+      {% for r in regs %}
+      <li class="reg-item is-{{ r.status }}">
+        <div class="reg-item-top">
+          <span class="reg-event">{{ r.event }}</span>
+          {{ ui.reg_badge(r.status, r.label) }}
+        </div>
+        <p class="reg-meta-line"><span class="badge status-{{ r.event_status }}">{{ r.event_status_label }}</span>
+          {% if r.has_voted %}<span class="badge badge-ok">{{ ui.icon('check') }} Voted</span>{% endif %}</p>
+        {% if r.status == 'rejected' %}
+        <p class="reg-reason"><b>Reason:</b> {{ r.reason or 'No reason given.' }}</p>
+        {% if r.event_status != 'previous' %}
+        <form method="post" action="{{ url_for('event_register', event_id=r.event_id) }}" data-busy="Sending...">
+          {{ ui.csrf() }}<button class="btn btn-sm" type="submit">{{ ui.icon('edit') }} Register again</button></form>
+        {% endif %}
+        {% elif r.status == 'pending' %}
+        <p class="hint">Submitted {{ r.submitted_at }}. Waiting for COMELEC to approve it.</p>
+        {% elif r.status == 'removed' %}
+        <p class="hint">COMELEC removed you from this event. Ask them if this is a mistake.</p>
+        {% elif r.event_status == 'upcoming' %}
+        <p class="hint">Voting starts {{ r.starts_txt or 'soon' }}.</p>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">{{ ui.icon('inbox') }}You haven't registered for any voting event yet.</p>
+    {% endif %}
+  </section>
+
+  {# ---- Vote history ---- #}
+  <section class="card" aria-labelledby="history-title">
+    <div class="card-head"><h2 id="history-title">{{ ui.icon('clock') }} Vote history</h2></div>
+    {% if history %}
+    <ul class="history-list">
+      {% for h in history %}
+      <li>
+        <span class="history-text"><b>{{ h.event }}</b><span class="muted small">Voted {{ h.cast_at }} · Receipt <span class="mono">{{ h.code }}</span></span></span>
+        <a class="btn btn-sm" href="{{ url_for('event_receipt', event_id=h.event_id) }}">{{ ui.icon('ballot') }} Receipt</a>
+      </li>
+      {% endfor %}
+    </ul>
+    <a class="hint" href="{{ url_for('account_history') }}">See your choices in each event</a>
+    {% else %}
+    <p class="empty">{{ ui.icon('ballot') }}You haven't voted in any event yet.</p>
+    {% endif %}
+  </section>
+
+  {# ---- Register for another event ---- #}
+  <section class="card" aria-labelledby="more-title">
+    <div class="card-head"><h2 id="more-title">{{ ui.icon('plus') }} Register for another event</h2></div>
+    {% if open_events %}
+    <ul class="history-list">
+      {% for e in open_events %}
+      <li>
+        <span class="history-text"><b>{{ e.name }}</b>
+          <span class="muted small"><span class="badge status-{{ e.status }}">{{ e.status_label }}</span>
+            {% if e.status == 'upcoming' %}Starts {{ e.starts_txt or 'soon' }}{% elif e.ends_txt %}Ends {{ e.ends_txt }}{% endif %}</span></span>
+        <form method="post" action="{{ url_for('event_register', event_id=e.id) }}" data-busy="Registering...">
+          {{ ui.csrf() }}<button class="btn btn-sm btn-reg" type="submit">{{ ui.icon('plus') }} Register</button></form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% elif not any_events %}
+    <p class="empty">{{ ui.icon('inbox') }}No voting events right now. You'll see them here when they open.</p>
+    {% else %}
+    <p class="empty">{{ ui.icon('check') }}No other open events to register for right now.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if s.account_status == 'pending' %}
+<script>
+  /* Waiting for verification: ask the server for THIS student's account status every 4 s (paused while the tab is
+     hidden, checked again as soon as it is visible). Verified -> "You're approved!" then the event list.
+     Rejected -> the reason. No click needed (works the same on phones and computers). */
+  document.addEventListener('DOMContentLoaded', function () {
+    var box = document.querySelector('[data-account-wait]');
+    if (!box || !window.fetch) return;
+    var url = box.getAttribute('data-account-wait'), timer = null, done = false;
+    function show(kind, html, role) {
+      box.className = 'alert ' + kind + ' account-status-msg';
+      box.setAttribute('role', role);
+      box.innerHTML = html;
+    }
+    function check() {
+      clearTimeout(timer);
+      if (done || document.hidden) return;
+      fetch(url, { cache: 'no-store', credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.status === 'verified') {
+            done = true;
+            show('alert-ok', '<svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><p><strong>You\'re approved!</strong> ' +
+                 'Your account was verified by the election committee. Taking you to the voting events...</p>', 'alert');
+            setTimeout(function () { location.replace(d.events_url); }, 1500);
+          } else if (d.status === 'rejected') {
+            done = true;
+            show('alert-error', '<svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg><p><strong>Your account was rejected: ' +
+                 BotoKo.esc(d.reason || 'no reason given') + '</strong> Please talk to your COMELEC officer to fix your details.</p>', 'alert');
+          } else if (d.status === 'logged_out') {
+            done = true;
+            location.replace(d.login_url);
+          } else {
+            timer = setTimeout(check, 4000);
+          }
+        })
+        .catch(function () { timer = setTimeout(check, 8000); });        // offline for a moment: try again later
+    }
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+    timer = setTimeout(check, 4000);
+  });
+</script>
+{% endif %}
+{% endblock %}

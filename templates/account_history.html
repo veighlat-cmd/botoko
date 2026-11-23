@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Vote History · BotoKo{% endblock %}
+{% block content %}
+{# One card per voting event this student is registered in. Shows only YOUR own record. #}
+<p class="eyebrow">My account</p>
+<h1>Vote History</h1>
+{% for h in history %}
+<section class="card history-card">
+  <div class="card-head">
+    <h2>{{ h.title }}</h2>
+    {{ ui.status_badge(h.event) }}
+    {% if h.voted %}<span class="badge badge-ok">{{ ui.icon('check') }} Voted</span>
+    {% else %}<span class="badge badge-warn">Not yet voted</span>{% endif %}
+  </div>
+  {% if h.voted %}
+  <dl class="facts">
+    <div><dt>Date and time (Philippine time)</dt><dd>{{ h.cast_at }}</dd></div>
+    <div><dt>Receipt code</dt><dd class="mono">{{ h.code }}</dd></div>
+  </dl>
+  <h3 class="eyebrow">Your choices</h3>
+  <ul class="picks">
+    {% for p in h.picks %}
+    {% for c in p.chosen %}
+    <li>{{ ui.avatar(c.name, c.party, 'md', c.photo, 40) }}<span class="pk-text"><span class="pk-pos">{{ p.position }}</span><span class="pk-name">{{ c.name }}</span>{% if c.party %}<span class="muted small">{{ c.party }}</span>{% endif %}</span></li>
+    {% else %}
+    <li class="pk-none"><span class="avatar md rv-none" aria-hidden="true">–</span><span class="pk-text"><span class="pk-pos">{{ p.position }}</span><span class="pk-name">No vote (skipped)</span></span></li>
+    {% endfor %}
+    {% endfor %}
+  </ul>
+  <div class="actions-row">
+    <a class="btn btn-primary" href="{{ url_for('event_receipt', event_id=h.event.id) }}">{{ ui.icon('ballot') }} View official receipt</a>
+    {% if h.status != 'upcoming' %}<a class="btn" href="{{ url_for('event_results', event_id=h.event.id) }}">{{ ui.icon('chart') }} Results</a>{% endif %}
+  </div>
+  {% else %}
+  <p class="muted">{% if h.status == 'current' %}Voting is open. You haven't voted yet.{% elif h.status == 'upcoming' %}Voting starts {{ h.event.starts_txt or 'soon' }}.{% else %}This event has ended. You did not vote.{% endif %}</p>
+  {% if h.status == 'current' %}
+  <div class="actions-row">
+    <a class="btn btn-primary" href="{{ url_for('event_ballot', event_id=h.event.id) }}">{{ ui.icon('ballot') }} Go to ballot</a>
+  </div>
+  {% endif %}
+  {% endif %}
+</section>
+{% else %}
+<div class="card empty">{{ ui.icon('inbox') }}You are not registered in any voting event yet. Ask your COMELEC officer.</div>
+{% endfor %}
+<p class="hint">Only you can see your choices, and only while logged in.</p>
+{% endblock %}

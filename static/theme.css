@@ -1,0 +1,420 @@
+/* =====================================================================================================
+   BotoKo design system (loaded AFTER style.css). Brand: flag blue / red / sun yellow stripe + logo.
+   1. Font + tokens (light + dark)       5. Cards (clickable cards, event cards, candidate cards)
+   2. Type scale + links                 6. Badges (status pills, not buttons)
+   3. Buttons (primary / secondary /     7. Header, tabs, forms, switch, tooltips, back-to-top
+      danger / success), states          8. Pages: login, events, account, admin
+   4. Focus + disabled                   9. Motion (ONLY in prefers-reduced-motion: no-preference;
+                                            transform + opacity, 150-400 ms)
+   ===================================================================================================== */
+
+/* ---------- 1. Font (self-hosted: works on school Wi-Fi without internet) + tokens ---------- */
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 400 800; font-display: swap;
+  src: url("fonts/inter-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+                 U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 400 800; font-display: swap;
+  src: url("fonts/inter-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+                 U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+:root {
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* brand */
+  --c-primary: #1442a8;  --c-primary-hover: #0f358a;  --c-primary-2: #2b5fd9;  --c-primary-soft: #e5ecfb;
+  --c-accent: #be1e2d;                                   /* LIVE + danger */
+  --c-sun: #f5c518;
+  --c-success: #136b40;  --c-success-btn: #15803d;  --c-success-btn-hover: #116932;  --c-on-success: #ffffff;
+  --c-link: #1442a8;     --c-link-hover: #0b2f7d;
+  --c-bg: #f2f5fb;       --c-bg-2: #e8eef9;
+  /* elevation */
+  --shadow-1: 0 1px 2px rgba(16, 24, 48, .06), 0 1px 3px rgba(16, 24, 48, .08);
+  --shadow-2: 0 4px 12px rgba(16, 24, 48, .10), 0 2px 4px rgba(16, 24, 48, .06);
+  --shadow-3: 0 14px 34px rgba(16, 24, 48, .16), 0 4px 10px rgba(16, 24, 48, .08);
+  --glow-primary: 0 8px 22px rgba(20, 66, 168, .32);
+  --glow-success: 0 8px 22px rgba(21, 128, 61, .30);
+  --glow-danger: 0 8px 22px rgba(190, 30, 45, .30);
+  --ring: 0 0 0 3px var(--c-surface), 0 0 0 6px var(--c-focus);
+  /* motion */
+  --t-fast: 150ms; --t-med: 250ms; --t-slow: 400ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1); --ease-spring: cubic-bezier(.3, 1.6, .5, 1);
+  --header-h: 64px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-primary-2: #a3bfff;
+    --c-success-btn: #4ade80; --c-success-btn-hover: #86efac; --c-on-success: #052e16;
+    --c-link: #9db9ff; --c-link-hover: #c2d4ff;
+    --c-bg: #0b101b; --c-bg-2: #111a2c;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow-2: 0 4px 14px rgba(0, 0, 0, .45);
+    --shadow-3: 0 14px 34px rgba(0, 0, 0, .55);
+    --glow-primary: 0 8px 22px rgba(132, 169, 255, .28);
+    --glow-success: 0 8px 22px rgba(74, 222, 128, .22);
+    --glow-danger: 0 8px 22px rgba(255, 129, 137, .25);
+  }
+}
+
+/* ---------- 2. Type scale + links ---------- */
+html { scroll-padding-top: calc(var(--header-h) + 12px); }
+body { font-family: var(--font); font-feature-settings: "cv11", "ss01"; background: var(--c-bg); }
+h1 { font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.25rem); font-weight: 800; letter-spacing: -.025em; }
+h2 { font-size: var(--fs-lg); font-weight: 750; letter-spacing: -.01em; }
+h3 { font-weight: 700; }
+.hint { color: var(--c-text-muted); }
+/* Text links: brand colour + ALWAYS underlined, a thicker underline grows left -> right on hover. */
+main a:not(.btn):not(.tab):not(.brand):not(.card):not(.results-out):not(.vote-now-card):not(.cand-more):not(.live-chip):not(.crumb):not([class*="nav"]),
+.footer a, .auth-foot a, .signin-links a {
+  color: var(--c-link); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  background: linear-gradient(currentColor, currentColor) left 100% / 0 2px no-repeat;
+  border-radius: 2px; transition: color var(--t-fast), background-size var(--t-med) var(--ease-out);
+}
+main a:not(.btn):not(.tab):not(.brand):not(.card):not(.results-out):not(.vote-now-card):not(.cand-more):not(.live-chip):not(.crumb):not([class*="nav"]):hover,
+.footer a:hover, .auth-foot a:hover, .signin-links a:hover { color: var(--c-link-hover); background-size: 100% 2px; }
+
+/* ---------- 3. Buttons: primary (filled), secondary (outlined), danger (red), success (green) ---------- */
+.btn {
+  position: relative; overflow: hidden; isolation: isolate;
+  min-height: 44px; padding: 0 var(--s-5); gap: .55em;
+  border: 1.5px solid var(--c-primary); border-radius: var(--r-md);
+  background: var(--c-surface); color: var(--c-primary);
+  font-weight: 700; letter-spacing: .005em;
+  box-shadow: var(--shadow-1); cursor: pointer;
+  transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast),
+              box-shadow var(--t-med) var(--ease-out), transform var(--t-fast) var(--ease-out), filter var(--t-fast);
+}
+.btn:hover { background: var(--c-primary-soft); color: var(--c-primary-hover); border-color: var(--c-primary-hover); box-shadow: var(--shadow-2); }
+.btn:active { transform: scale(.97); box-shadow: var(--shadow-1); }
+.btn-sm { min-height: 44px; padding: 0 var(--s-3); }
+.btn-lg { min-height: 56px; }
+/* Primary: the ONE main action. Filled brand blue, shine on hover, soft glow. */
+.btn-primary {
+  background: linear-gradient(180deg, var(--c-primary-2), var(--c-primary)); border-color: transparent; color: var(--c-on-primary);
+  box-shadow: var(--shadow-2);
+}
+@media (prefers-color-scheme: dark) { .btn-primary { background: var(--c-primary); } }
+.btn-primary:hover { background: linear-gradient(180deg, var(--c-primary-2), var(--c-primary)); color: var(--c-on-primary);
+  border-color: transparent; filter: brightness(1.08); box-shadow: var(--glow-primary); }
+@media (prefers-color-scheme: dark) { .btn-primary:hover { background: var(--c-primary-hover); } }
+.btn-primary::after {                               /* the light "shine" (moves only with motion allowed) */
+  content: ""; position: absolute; inset: -2px; z-index: 0; pointer-events: none; opacity: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .45) 50%, transparent 70%);
+  transform: translateX(-120%);
+}
+.btn > :not(.ripple) { position: relative; z-index: 1; }
+/* Danger: red, for Reject / Delete / Close voting */
+.btn-danger { background: var(--c-danger); border-color: var(--c-danger); color: var(--c-on-danger); }
+.btn-danger:hover { background: var(--c-danger-hover); border-color: var(--c-danger-hover); color: var(--c-on-danger); box-shadow: var(--glow-danger); }
+.btn-danger-outline { background: var(--c-surface); border-color: var(--c-danger); color: var(--c-danger); }
+.btn-danger-outline:hover { background: var(--c-danger-soft); border-color: var(--c-danger-hover); color: var(--c-danger-hover); box-shadow: var(--glow-danger); }
+/* Success: green, for Approve */
+.btn-success { background: var(--c-success-btn); border-color: var(--c-success-btn); color: var(--c-on-success); }
+.btn-success:hover { background: var(--c-success-btn-hover); border-color: var(--c-success-btn-hover); color: var(--c-on-success); box-shadow: var(--glow-success); }
+/* Ghost: quiet secondary (still outlined, so it reads as a button) */
+.btn-ghost { background: var(--c-surface); border-color: var(--c-border-strong); color: var(--c-text); box-shadow: none; }
+.btn-ghost:hover { background: var(--c-surface-2); border-color: var(--c-primary); color: var(--c-primary); }
+.btn.back-btn { border: 1.5px solid var(--c-border-strong); background: var(--c-surface); color: var(--c-primary); padding: 0 var(--s-3);
+  min-height: 44px; box-shadow: var(--shadow-1); }
+.btn.back-btn:hover { border-color: var(--c-primary); background: var(--c-primary-soft); }
+.btn.btn-live { background: var(--c-danger); border-color: var(--c-danger); color: var(--c-on-danger); }
+.btn.btn-live:hover { background: var(--c-danger-hover); border-color: var(--c-danger-hover); color: var(--c-on-danger); box-shadow: var(--glow-danger); }
+.btn.btn-voted { background: var(--c-success-soft); border-color: var(--c-success); color: var(--c-success); }
+.btn.btn-voted:hover { background: var(--c-success-soft); border-color: var(--c-success); color: var(--c-success); box-shadow: var(--glow-success); }
+.btn-reg { border-style: solid; }
+
+/* ---------- 4. Focus + disabled ---------- */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid var(--c-focus); outline-offset: 3px; }
+.btn:focus-visible, .tab:focus-visible { outline: none; box-shadow: var(--ring); }
+.btn:disabled, .btn[aria-disabled="true"], .btn.is-disabled {
+  opacity: 1; cursor: not-allowed; transform: none; filter: none;
+  background: var(--c-surface-2); border: 1.5px dashed var(--c-border-strong); color: var(--c-text-muted); box-shadow: none;
+}
+.btn:disabled::after { display: none; }
+.btn.is-loading { cursor: progress; }
+.btn.is-done { background: var(--c-success-btn); border-color: var(--c-success-btn); color: var(--c-on-success); }
+
+/* ---------- 5. Cards ---------- */
+.card { border-radius: var(--r-lg); box-shadow: var(--shadow-1); }
+/* Clickable cards: border, chevron, whole card clickable (the title link stretches over the card). */
+.is-clickable { position: relative; cursor: pointer; border: 1.5px solid var(--c-border-strong);
+  transition: transform var(--t-med) var(--ease-out), box-shadow var(--t-med) var(--ease-out), border-color var(--t-fast); }
+.is-clickable:hover { border-color: var(--c-primary); box-shadow: var(--shadow-3); }
+.stretch::after { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.is-clickable :is(.btn, form, .badge-link, .event-actions a) { position: relative; z-index: 2; }
+.chev { display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; margin-left: .25em; border-radius: 50%;
+  background: var(--c-primary-soft); color: var(--c-primary); font-weight: 800; line-height: 1; flex: none;
+  transition: transform var(--t-fast) var(--ease-out), background-color var(--t-fast); }
+.is-clickable:hover .chev { background: var(--c-primary); color: var(--c-on-primary); }
+/* event cards: coloured top border grows in on hover */
+.event-card { overflow: hidden; padding-top: calc(var(--s-5) + 2px); border-top-width: 1.5px; }
+.event-card::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; z-index: 0;
+  background: linear-gradient(90deg, var(--c-primary) 0 45%, var(--c-accent) 45% 90%, var(--c-sun) 90%);
+  transform: scaleX(.18); transform-origin: left; transition: transform var(--t-slow) var(--ease-out); }
+.event-card.is-current::before { background: var(--c-success-btn); }
+.event-card:hover::before, .event-card:focus-within::before { transform: scaleX(1); }
+.event-card .event-name { display: flex; align-items: center; gap: .3em; font-size: var(--fs-xl); margin: 0; }
+.event-card .event-name a { color: var(--c-text); text-decoration: none; }
+.event-card .event-name a:hover { color: var(--c-primary); }
+.event-card .event-actions { margin-top: auto; display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
+.event-card .event-actions > .btn-primary, .event-card .event-actions > form .btn-primary { flex: 1 1 12rem; }
+.event-ico { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; flex: none;
+  background: var(--c-primary-soft); color: var(--c-primary); }
+.event-card.is-current .event-ico { background: var(--c-success-soft); color: var(--c-success); }
+.event-card.is-previous .event-ico { background: var(--c-sun-soft); color: var(--c-on-sun); }
+.live-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 var(--s-3); border-radius: var(--r-full);
+  color: var(--c-danger); font-weight: 750; font-size: var(--fs-sm); text-decoration: none; border: 1.5px solid var(--c-danger-soft);
+  background: var(--c-surface); position: relative; z-index: 2; }
+.live-chip:hover { background: var(--c-danger-soft); border-color: var(--c-danger); }
+.live-chip .live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c-danger); }
+/* candidate cards (ballot): keep sizes EXACTLY. Their text keeps the previous system font (same line
+   breaks, so the same card heights); the photo zooms inside its box. */
+.cand { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+.cand-photo-wrap { isolation: isolate; }
+.cand { transform-style: preserve-3d; }
+.cand-more { cursor: pointer; }
+/* stat cards */
+.stat { border-radius: var(--r-lg); box-shadow: var(--shadow-1); }
+
+/* ---------- 6. Badges: coloured status pills (no shadow, no pointer: clearly NOT buttons) ---------- */
+.badge { border-radius: var(--r-full); padding: .2em .7em; font-weight: 700; font-size: var(--fs-xs); letter-spacing: .02em;
+  box-shadow: none; cursor: default; border: 0; position: relative; overflow: hidden; vertical-align: middle; }
+.badge.reg-pending::before, .state-chip.is-pending::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 5px; vertical-align: middle; }
+.badge.reg-pending .icon, .state-chip.is-pending .icon { display: none; }
+.badge-lead { color: #3b2c00; }
+.badge-lead::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, .7) 50%, transparent 65%); transform: translateX(-120%); }
+.state-chip { border-radius: var(--r-full); cursor: default; }
+
+/* ---------- 7. Header, tabs, forms, switch, tooltips, back to top ---------- */
+.topbar { position: sticky; top: 0; z-index: 60; transition: box-shadow var(--t-med), background-color var(--t-med); }
+.topbar.is-scrolled { box-shadow: 0 6px 20px rgba(16, 24, 48, .12); background: color-mix(in srgb, var(--c-surface) 82%, transparent);
+  -webkit-backdrop-filter: saturate(1.6) blur(10px); backdrop-filter: saturate(1.6) blur(10px); }
+body.page-ballot .topbar, html.projector .topbar { position: relative; }      /* the ballot keeps its fixed layout */
+body.has-account-menu.modal-open:not(.page-ballot) .topbar { position: sticky; }
+.nav a { font-weight: 650; }
+.nav a:not(.nav-live):not(.nav-login) { border: 1.5px solid transparent; }
+.nav a:not(.nav-live):not(.nav-login):hover { border-color: var(--c-border-strong); background: var(--c-surface); }
+.nav a[aria-current="page"] { background: var(--c-primary-soft); color: var(--c-primary); border-color: var(--c-primary) !important; }
+.nav a.nav-login { box-shadow: var(--shadow-2); }
+.nav-btn { border: 1.5px solid var(--c-border-strong); }
+.nav-btn:hover { border-color: var(--c-danger); color: var(--c-danger); background: var(--c-surface); }
+/* account menu: avatar button */
+.menu-btn { gap: 8px; padding: 0 10px 0 4px; border: 1.5px solid var(--c-border-strong); box-shadow: var(--shadow-1);
+  transition: border-color var(--t-fast), box-shadow var(--t-med), transform var(--t-fast); }
+.menu-btn:hover { border-color: var(--c-primary); box-shadow: var(--shadow-2); }
+.menu-avatar { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; flex: none;
+  background: linear-gradient(135deg, var(--c-primary-2), var(--c-primary)); color: #fff; font-weight: 800; font-size: .8rem; letter-spacing: .02em; }
+.menu-btn .menu-caret { width: 16px; height: 16px; transition: transform var(--t-fast); }
+.menu-btn[aria-expanded="true"] .menu-caret { transform: rotate(180deg); }
+.drawer-links a { border-radius: var(--r-md); transition: background-color var(--t-fast), transform var(--t-fast); }
+.drawer-links a::after { content: "›"; margin-left: auto; font-size: 1.3em; color: var(--c-text-muted); }
+/* tabs: look like tabs + sliding indicator (JS adds .has-indicator) */
+.tabs { position: relative; border: 1.5px solid var(--c-border); background: var(--c-surface-2); }
+.tab { cursor: pointer; font-weight: 700; transition: color var(--t-fast); z-index: 1; }
+.tab:hover { color: var(--c-primary); }
+.tabs.has-indicator .tab[aria-selected="true"] { background: transparent; box-shadow: none; }
+.tab-indicator { position: absolute; left: 0; top: 0; width: 100px; z-index: 0; pointer-events: none;
+  background: var(--c-surface); border-radius: var(--r-sm); box-shadow: var(--shadow-2); transform-origin: left top; }
+.tab-indicator::after { content: ""; position: absolute; left: 12%; right: 12%; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--c-primary); }
+/* forms */
+.field input, .field select, .field textarea {
+  min-height: 48px; border: 1.5px solid var(--c-border-strong); border-radius: var(--r-md); background: var(--c-surface);
+  transition: border-color var(--t-fast), box-shadow var(--t-med) var(--ease-out); }
+.field input:hover, .field select:hover, .field textarea:hover { border-color: var(--c-primary); }
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--c-primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-primary) 22%, transparent); }
+.field input.was-typed:valid:not([type="password"]):not([type="search"]):not([type="file"]):not([type="checkbox"]),
+.field textarea.was-typed:valid {
+  border-color: var(--c-success);
+  background: var(--c-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23138a4b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") no-repeat right 12px center / 18px;
+  padding-right: 40px; }
+.field input[aria-invalid="true"] { border-color: var(--c-danger); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-danger) 18%, transparent); }
+/* floating labels (login, create account, forgot Voter ID) */
+.auth .field.float { position: relative; }
+.auth .field.float > label { position: absolute; left: 14px; top: 0; z-index: 2; pointer-events: none; margin: 0;
+  color: var(--c-text-muted); font-weight: 600; font-size: var(--fs-md); transform-origin: left top;
+  transform: translateY(15px); transition: transform var(--t-med) var(--ease-out), color var(--t-fast); }
+.auth .field.float input { min-height: 56px; padding-top: 20px; padding-bottom: 4px; }
+.auth .field.float input::placeholder { color: transparent; transition: color var(--t-fast); }
+.auth .field.float:focus-within input::placeholder { color: var(--c-text-muted); }
+.auth .field.float:focus-within > label,
+.auth .field.float:has(input:not(:placeholder-shown)) > label { transform: translateY(6px) scale(.78); color: var(--c-primary); }
+/* auto-approve / auto-publish: a real switch */
+.check-row { align-items: center; transition: border-color var(--t-fast), background-color var(--t-fast); }
+.check-row:hover { border-color: var(--c-primary); }
+.check-row input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none; position: relative; flex: none; cursor: pointer; margin: 0;
+  width: 50px; height: 28px; border-radius: 999px; background: var(--c-border-strong); transition: background-color var(--t-med); }
+.check-row input[type="checkbox"]::before { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform var(--t-med) var(--ease-spring); }
+.check-row input[type="checkbox"]:checked { background: var(--c-success-btn); }
+.check-row input[type="checkbox"]:checked::before { transform: translateX(22px); }
+.check-row input[type="checkbox"]:focus-visible { outline: 3px solid var(--c-focus); outline-offset: 3px; }
+/* tooltips (icon-only buttons, disabled buttons with a reason) */
+.tip { position: fixed; z-index: 200; max-width: 260px; padding: 6px 10px; border-radius: 8px; pointer-events: none;
+  background: #111827; color: #fff; font-size: var(--fs-xs); font-weight: 600; line-height: 1.35; box-shadow: var(--shadow-2);
+  opacity: 0; transform: translateY(4px); transition: opacity var(--t-fast), transform var(--t-fast); }
+.tip.is-on { opacity: 1; transform: none; }
+.tip-wrap { display: inline-flex; }
+.tip-wrap > .btn { flex: 1; }
+/* back to top */
+.to-top { position: fixed; right: 16px; bottom: 16px; z-index: 55; width: 48px; height: 48px; border-radius: 50%;
+  display: grid; place-items: center; border: 1.5px solid var(--c-primary); background: var(--c-surface); color: var(--c-primary);
+  box-shadow: var(--shadow-3); cursor: pointer; opacity: 0; transform: translateY(16px) scale(.9); pointer-events: none;
+  transition: opacity var(--t-med), transform var(--t-med) var(--ease-out), background-color var(--t-fast); }
+.to-top.is-on { opacity: 1; transform: none; pointer-events: auto; }
+.to-top:hover { background: var(--c-primary); color: var(--c-on-primary); }
+.to-top .icon { transform: rotate(90deg); }
+body.page-ballot .to-top { display: none; }
+/* empty states */
+.empty .btn { margin-top: var(--s-3); }
+
+/* ---------- 8. Pages ---------- */
+/* login / create account / forgot: welcoming, soft moving brand shapes in the background */
+.login-first, body:has(.auth) main { position: relative; }
+body:has(.auth) { overflow-x: hidden; }
+body:has(.auth)::before, body:has(.auth)::after {
+  content: ""; position: fixed; z-index: -1; pointer-events: none; border-radius: 50%; filter: blur(60px); opacity: .55; }
+body:has(.auth)::before { width: 46vmax; height: 46vmax; left: -14vmax; top: -12vmax;
+  background: radial-gradient(circle, color-mix(in srgb, var(--c-primary) 45%, transparent), transparent 65%); }
+body:has(.auth)::after { width: 40vmax; height: 40vmax; right: -12vmax; bottom: -14vmax;
+  background: radial-gradient(circle, color-mix(in srgb, var(--c-sun) 55%, transparent), transparent 65%); }
+.auth .card { box-shadow: var(--shadow-3); border: 1px solid var(--c-border); border-radius: var(--r-xl); }
+.auth .auth-brand .logo { filter: drop-shadow(0 10px 26px rgba(247, 186, 45, .28)); }
+.login-first .btn-primary.btn-lg { font-size: var(--fs-lg); }
+.signin-links li { display: flex; gap: .4em; justify-content: center; flex-wrap: wrap; }
+/* events page */
+.events-hero h1 { font-size: clamp(1.7rem, 1.2rem + 2vw, 2.4rem); }
+.results-out { border: 1.5px solid rgba(59, 44, 0, .2); }
+/* account sections */
+.account-grid .card-head h2 .icon, .section-h .icon { display: inline-grid; color: var(--c-primary); }
+.vote-now-card { border: 1.5px solid var(--c-success); }
+.history-list li { border-radius: var(--r-sm); }
+/* admin */
+.summary-cards .stat { border-top: 4px solid var(--c-primary); }
+.summary-cards .stat-good { border-top-color: var(--c-success-btn); }
+.summary-cards .stat-accent { border-top-color: var(--c-sun); }
+.table th { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--c-text-muted); }
+.student-table tbody tr { transition: background-color var(--t-fast); }
+.student-table tbody tr:hover { background: var(--c-surface-2); }
+
+/* ---------- 9. Motion: only when the user allows it (transform + opacity) ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+  ::view-transition-old(root) { animation: vt-out var(--t-fast) ease-in both; }
+  ::view-transition-new(root) { animation: vt-in var(--t-med) var(--ease-out) both; }
+  @keyframes vt-out { to { opacity: 0; transform: translateY(-6px); } }
+  @keyframes vt-in { from { opacity: 0; transform: translateY(8px); } }
+
+  .btn:hover:not(:disabled) { transform: translateY(-2px); }
+  .btn:active:not(:disabled) { transform: translateY(0) scale(.97); transition-duration: 80ms; }
+  .btn-primary:hover:not(:disabled)::after { opacity: 1; transform: translateX(120%); transition: transform .6s var(--ease-out), opacity var(--t-fast); }
+  .btn .icon { transition: transform var(--t-med) var(--ease-spring); }
+  .btn:hover .icon:has(use[href="#i-plus"]) { transform: rotate(90deg); }
+  .btn:hover .icon:has(use[href="#i-arrow"]), .btn:hover .icon:has(use[href="#i-download"]) { transform: translateX(3px); }
+  .btn:hover .icon:has(use[href="#i-download"]) { transform: translateY(2px); }
+  .btn:hover .icon:has(use[href="#i-back"]) { transform: translateX(-3px); }
+  .btn:hover .icon:has(use[href="#i-check"]) { animation: ico-bounce .45s var(--ease-spring); }
+  .btn:hover .icon:has(use[href="#i-ballot"]) { transform: translateY(-2px) rotate(-6deg); }
+  @keyframes ico-bounce { 40% { transform: translateY(-4px) scale(1.15); } }
+  .btn.is-done .icon { animation: ico-bounce .45s var(--ease-spring); }
+
+  .is-clickable:hover { transform: translateY(-3px); }
+  .is-clickable:hover .chev { transform: translateX(3px); }
+  .event-card:hover .event-ico { transform: scale(1.08) rotate(-4deg); }
+  .event-ico { transition: transform var(--t-med) var(--ease-spring); }
+  .vote-now-card:hover { transform: translateY(-3px); }
+  .vote-now-card { transition: transform var(--t-med) var(--ease-out), box-shadow var(--t-med); }
+
+  @media (hover: hover) {
+    .cand-photo { transition: transform var(--t-slow) var(--ease-out); }
+    .cand:hover .cand-photo { transform: translateX(-50%) scale(1.06); }
+    .cand:hover .cand-initials { transform: scale(1.06); }
+    .cand.is-tilting { transition: transform 80ms linear, box-shadow var(--t-med), border-color var(--t-fast); }
+    .cand.is-tilting:not(.is-selected) { transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-3px); }
+  }
+
+  .badge.reg-pending::before, .state-chip.is-pending::before { animation: breathe 2.2s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: .25; transform: scale(.7); } }
+  .badge-lead::after { animation: badge-shine 3.2s ease-in-out infinite; }
+  @keyframes badge-shine { 0%, 60% { opacity: 0; transform: translateX(-120%); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateX(120%); } }
+
+  .field input[aria-invalid="true"] { animation: shake .4s cubic-bezier(.36, .07, .19, .97) both; }
+  @keyframes shake { 20%, 80% { transform: translateX(-2px); } 30%, 70% { transform: translateX(4px); } 40%, 60% { transform: translateX(-6px); } 50% { transform: translateX(6px); } }
+
+  .tab-indicator { transition: transform var(--t-med) var(--ease-out); }
+  .menu-btn:active { transform: scale(.96); }
+  .drawer-links a:hover { transform: translateX(3px); }
+
+  body:has(.auth)::before { animation: float-a 18s ease-in-out infinite alternate; }
+  body:has(.auth)::after { animation: float-b 22s ease-in-out infinite alternate; }
+  @keyframes float-a { to { transform: translate(8vmax, 6vmax) scale(1.08); } }
+  @keyframes float-b { to { transform: translate(-7vmax, -5vmax) scale(1.1); } }
+}
+
+/* upcoming card: "Starts in 2d 5h" (text, not a button) + previous card receipt text link */
+.countdown-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 var(--s-3); border-radius: var(--r-full);
+  background: var(--c-primary-soft); color: var(--c-primary); font-size: var(--fs-sm); font-weight: 700; cursor: default; }
+.countdown-chip .cd-chip { margin-left: .25em; }
+.receipt-link { position: relative; z-index: 2; font-weight: 650; }
+/* ballot: progress bar + skip option clearly interactive (sizes unchanged) */
+.progress-track { height: 8px; background: var(--c-border); }
+.progress-fill { background: linear-gradient(90deg, var(--c-success-btn), #22c55e); }
+.skip-card { border: 1.5px dashed var(--c-border-strong); cursor: pointer; transition: border-color var(--t-fast), background-color var(--t-fast); }
+.skip-choice:hover .skip-card { border-color: var(--c-primary); background: var(--c-primary-soft); color: var(--c-primary); }
+.cand-more { font-weight: 700; color: var(--c-primary); }
+.submitbar { box-shadow: 0 -6px 20px rgba(16, 24, 48, .10); }
+.view-more { border-width: 1.5px; }
+
+/* tap targets: everything you can press is at least 44px tall */
+.chip { min-height: 44px; }
+.btn-icon { min-width: 44px; min-height: 44px; }
+.nav a, .nav-btn, .menu-btn { min-height: 44px; }
+.tab { min-height: 48px; }
+/* narrow phones: long badges and the filter segments wrap instead of widening the page */
+.official-head > div { min-width: 0; }
+.official-head .badge { white-space: normal; line-height: 1.35; }
+.segmented { flex-wrap: wrap; max-width: 100%; }
+.segmented button { min-height: 44px; }
+.wa-votes { white-space: normal; }
+/* the LIVE chip on current event cards keeps the red heartbeat (paused on hover, none with reduced motion) */
+@media (prefers-reduced-motion: no-preference) {
+  .live-chip { animation: heartbeat 2.4s ease-in-out infinite; }
+  .live-chip:hover { animation-play-state: paused; }
+  .live-chip .live-dot { animation: pulse 1.6s ease-in-out infinite; }
+}
+/* hover lift + glow: same specificity as the older rule in style.css, so these win */
+@media (prefers-reduced-motion: no-preference) {
+  .btn:not(:disabled):not(.btn-ghost):hover { transform: translateY(-2px); filter: none; box-shadow: var(--shadow-2); }
+  .btn.btn-primary:not(:disabled):not(.btn-ghost):hover { filter: brightness(1.08); box-shadow: var(--glow-primary); }
+  .btn.btn-success:not(:disabled):not(.btn-ghost):hover { box-shadow: var(--glow-success); }
+  .btn.btn-danger:not(:disabled):not(.btn-ghost):hover,
+  .btn.btn-danger-outline:not(:disabled):not(.btn-ghost):hover,
+  .btn.btn-live:not(:disabled):not(.btn-ghost):hover { box-shadow: var(--glow-danger); }
+  .btn:not(:disabled):not(.btn-ghost):active { transform: translateY(0) scale(.97); }
+}
+/* phones: table row actions are real buttons now, so no optical negative margin (it made them overlap) */
+@media (max-width: 719px) {
+  .student-table .st-actions .btn { margin-left: 0; }
+  .student-table td.st-actions { gap: var(--s-2); }
+}
+
+/* phones: the header stays ONE row: Events / Dashboard / Log out become icon buttons (tooltip + screen-reader text) */
+.nav-live .lbl-short { display: none; }
+@media (max-width: 480px) {
+  .nav { gap: 6px; }
+  .nav-live .lbl-long { display: none; }
+  .nav-live .lbl-short { display: inline; }
+  .menu-btn .menu-label { display: none; }
+  .menu-btn { padding: 0 6px 0 4px; }
+  .nav > a:not(.nav-live):not(.nav-login), .nav .nav-btn { min-width: 44px; padding: 0; justify-content: center; }
+  .nav > a:not(.nav-live):not(.nav-login) > span, .nav .nav-btn > span {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .nav a.nav-live { padding: 0 var(--s-3); }
+  .brand span { font-size: var(--fs-md); }
+}

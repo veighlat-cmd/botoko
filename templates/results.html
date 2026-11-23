@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Live results · BotoKo{% endblock %}
+{% block head %}
+  {# Turn projector mode on before the page draws (no flicker): ?projector=1 or remembered choice. #}
+  <script>
+    try {
+      var q = /[?&]projector=(\d)/.exec(location.search);
+      var on = q ? q[1] === '1' : localStorage.getItem('botoko-projector') === '1';
+      if (on) document.documentElement.classList.add('projector');
+    } catch (e) {}
+  </script>
+{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+{% if ev.status == 'previous' and session.get('is_admin') and not ev.published %}
+<div class="alert alert-warn results-admin-note" role="status">{{ ui.icon('lock') }}
+  <p><strong>Final results - not yet published.</strong>Only you (the admin) can see them. Students see
+    "The official results will be announced soon" until you publish them in the dashboard.</p></div>
+{% endif %}
+{% if winners and ev.published %}{% include "_winners_announce.html" %}{% endif %}
+{% include "_results.html" %}
+<button type="button" class="btn btn-sm projector-exit" data-projector-exit>{{ ui.icon('shrink') }} Exit projector mode (Esc)</button>
+{% endblock %}
+{% block scripts %}<script src="{{ asset('results.js') }}" defer></script>{% endblock %}

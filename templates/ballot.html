@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Ballot · BotoKo{% endblock %}
+{% block head %}
+  {# While voting is closed (or the ballot is empty) re-check every 15 s, so students
+     waiting on this page get the ballot as soon as COMELEC opens the election. #}
+  {% if not election.is_open or not positions %}<meta http-equiv="refresh" content="15">{% endif %}
+{% endblock %}
+{# The ballot uses a wide page so candidate cards can fill the screen. #}
+{% block main_class %}{% if election.is_open and positions %}ballot-page{% endif %}{% endblock %}
+{% block body_class %}page-ballot{% if election.is_open and positions %} has-submitbar{% endif %}{% endblock %}
+{% block content %}
+
+{% if not election.is_open %}
+<section class="card state">
+  <div class="hero-icon warn">{{ ui.icon('clock') }}</div>
+  <p class="eyebrow">{{ ev.name }}</p>
+  <h1>{{ 'This voting event has ended' if ev.status == 'previous' else 'Voting is closed right now' }}</h1>
+  {{ ui.voter_line(g.student) }}
+  <p class="muted">{% if ev.status == 'previous' %}No more ballots are accepted. See the final results and winners.
+    {% else %}Please wait for COMELEC to open this event. This page checks again automatically, so you can keep it open.{% endif %}</p>
+  <div class="actions">
+    {% if ev.status == 'previous' %}
+    <a class="btn btn-primary" href="{{ url_for('event_results', event_id=ev.id) }}">{{ ui.icon('chart') }} Results &amp; winners</a>
+    {% else %}
+    <a class="btn btn-primary" href="{{ url_for('event_ballot', event_id=ev.id) }}">{{ ui.icon('refresh') }} Check again</a>
+    {% endif %}
+    <a class="btn" href="{{ url_for('index') }}">{{ ui.icon('home') }} All events</a>
+    <a class="btn btn-ghost" href="{{ url_for('logout') }}">{{ ui.icon('logout') }} Log out</a>
+  </div>
+</section>
+
+{% elif not positions %}
+<section class="card state">
+  <div class="hero-icon">{{ ui.icon('inbox') }}</div>
+  <p class="eyebrow">{{ election.title }}</p>
+  <h1>No candidates yet</h1>
+  <p class="muted">COMELEC hasn't added the candidates to the ballot yet. This page checks again automatically.</p>
+  <div class="actions">
+    <a class="btn btn-primary" href="{{ url_for('event_ballot', event_id=ev.id) }}">{{ ui.icon('refresh') }} Check again</a>
+    <a class="btn" href="{{ url_for('index') }}">{{ ui.icon('home') }} All events</a>
+  </div>
+</section>
+
+{% else %}
+<section class="ballot-intro">
+  <p class="eyebrow">{{ ev.name }}{% if ev.organization %} · {{ ev.organization }}{% endif %}</p>
+  <h1>Your ballot</h1>
+  {{ ui.voter_line(g.student) }}
+  <p class="muted">Choose one candidate for each position you want to vote for (some positions let you choose more,
+    for example "Choose up to 3"). Voting is optional per position: you may skip any of them. Then review and submit.
+    You can only vote once in this event.</p>
+  {% if other_events %}
+  <p class="other-events-line">{{ ui.icon('ballot') }} You are also registered in:
+    {% for o in other_events %}<a href="{{ url_for('event_ballot', event_id=o.id) }}">{{ o.name }}{{ ' (voted)' if o.has_voted }}</a>{{ ', ' if not loop.last }}{% endfor %}</p>
+  {% endif %}
+</section>
+
+<form method="post" action="{{ url_for('event_vote', event_id=ev.id) }}" id="ballot" data-voter="{{ g.student.id }}" data-event="{{ ev.id }}">
+  {{ ui.csrf() }}
+  {% for p in positions %}
+  {% set multi = p.seats > 1 %}
+  <fieldset class="card position{{ ' is-multi' if multi }}" id="pos-{{ p.id }}" data-position="{{ p.name }}" data-seats="{{ p.seats }}">
+    {# Position label: a block at the top-left (about 1/4 of the width), cards below it. #}
+    <legend>
+      <span class="pos-label">
+        <span class="pos-num" aria-hidden="true">{{ loop.index }}</span>
+        <span class="pos-name">{{ p.name }}</span>
+      </span>
+      <span class="pos-state" aria-hidden="true">{{ ('Choose up to ' ~ p.seats ~ ' or skip') if multi else 'Choose 1 or skip' }}</span>
+    </legend>
+    {# Card grid: ALL candidates of a position side by side in ONE row, at every screen size:
+       repeat(N, minmax(0, 1fr)) with N = number of candidates (max 4; 5 or more wrap into rows of 4).
+       data-count="1" = one centred card, as wide as one card of a 2-candidate row. See style.css. #}
+    {% set n = p.candidates|length %}
+    <div class="choices" data-count="{{ n }}" style="--n: {{ [n, 4]|min }}">
+      {% for c in p.candidates %}
+      {# One candidate card. The whole card is the radio button's label, so tapping anywhere
+         on it selects the candidate. "View full profile" sits outside the label. #}
+      <div class="cand">
+        <label class="choice">
+          <input type="{{ 'checkbox' if multi else 'radio' }}" name="pos_{{ p.id }}" value="{{ c.id }}"
+                 data-name="{{ c.name }}" data-party="{{ c.party }}" data-photo="{{ c.photo or '' }}"
+                 data-initials="{{ c.name|initials }}" data-tone="{{ (c.party or c.name)|tone }}">
+          <span class="choice-card">
+            {# Photo = the main part of the card (portrait 4:5). The check badge sits on the photo. #}
+            <span class="cand-photo-wrap{% if c.photo %} has-photo" style="--photo: url('{{ c.photo }}'){% endif %}">
+              {% if c.photo %}
+              <img class="cand-photo" src="{{ c.photo }}" alt="Photo of {{ c.name }}" width="400" height="500" decoding="async">
+              {% else %}
+              <span class="cand-photo cand-initials tone-{{ (c.party or c.name)|tone }}" aria-hidden="true">{{ c.name|initials }}</span>
+              {% endif %}
+              <span class="choice-mark" aria-hidden="true">{{ ui.icon('check') }}</span>
+            </span>
+            <span class="choice-text">
+              <span class="choice-name">{{ c.name }}</span>
+              {% if c.party %}<span class="choice-party">{{ c.party }}</span>{% endif %}
+              {% if c.course_year %}<span class="choice-meta">{{ ui.icon('ballot') }} {{ c.course_year }}</span>{% endif %}
+              {% if c.motto %}<span class="choice-motto">“{{ c.motto }}”</span>{% endif %}
+            </span>
+          </span>
+        </label>
+        <button type="button" class="cand-more" data-profile="profile-{{ c.id }}" aria-haspopup="dialog" hidden>
+          {{ ui.icon('info') }}<span>View <span class="more-full">full </span>profile{% if c.background %}<span class="more-count"> · {{ c.background|length }} achievement{{ 's' if c.background|length != 1 }}</span>{% endif %}</span>
+        </button>
+        {# Full profile, shown in the "profile" dialog by ballot.js #}
+        <template id="profile-{{ c.id }}">
+          <div class="profile-head">
+            {% if c.photo %}<img class="profile-photo" src="{{ c.photo }}" alt="Photo of {{ c.name }}" width="400" height="400">
+            {% else %}<span class="profile-photo cand-initials tone-{{ (c.party or c.name)|tone }}" aria-hidden="true">{{ c.name|initials }}</span>{% endif %}
+            <div>
+              <p class="eyebrow">Candidate for {{ p.name }}</p>
+              <h2 id="profile-title">{{ c.name }}</h2>
+              {% if c.party %}<span class="choice-party">{{ c.party }}</span>{% endif %}
+              {% if c.course_year %}<p class="muted small" style="margin:var(--s-1) 0 0">{{ c.course_year }}</p>{% endif %}
+            </div>
+          </div>
+          {% if c.motto %}<blockquote class="profile-motto">“{{ c.motto }}”</blockquote>{% endif %}
+          <h3 class="eyebrow">Background</h3>
+          {% if c.background %}
+          <ul class="profile-bg">{% for item in c.background %}<li>{{ ui.icon('star') }}<span>{{ item }}</span></li>{% endfor %}</ul>
+          {% else %}<p class="muted small">No background information was provided.</p>{% endif %}
+        </template>
+      </div>
+      {% endfor %}
+    </div>
+    {% if multi %}
+    {# Shown by ballot.js when the maximum is reached (the other cards are then disabled). #}
+    <p class="seat-limit" role="status" hidden>{{ ui.icon('info') }} Maximum of {{ p.seats }} selected – unselect one to change.</p>
+    {% endif %}
+    {# Skip = abstain. Its value is empty, so the server receives "no vote" for this position. #}
+    <label class="skip-choice">
+      <input type="{{ 'checkbox' if multi else 'radio' }}" name="pos_{{ p.id }}" value="" data-skip>
+      <span class="skip-card"><span class="skip-mark" aria-hidden="true">{{ ui.icon('x') }}</span>No vote for this position (skip)</span>
+    </label>
+  </fieldset>
+  {% endfor %}
+
+  <div class="submitbar">
+    <div class="submitbar-inner">
+      <div class="progress">
+        <span class="progress-text" id="progress-text" aria-live="polite">0 of {{ positions|length }} positions voted</span>
+        <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="progress-fill"></div></div>
+      </div>
+      <button class="btn btn-primary btn-lg" type="submit" id="submitBtn">Review vote</button>
+    </div>
+  </div>
+</form>
+
+{# Candidate profile dialog ("View full profile"), filled in by ballot.js. #}
+<div class="modal" id="profile" role="dialog" aria-modal="true" aria-labelledby="profile-title" hidden>
+  <div class="modal-panel profile-panel">
+    <div id="profile-body"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close-modal>{{ ui.icon('x') }} Close</button>
+      <button type="button" class="btn btn-primary" id="profile-select">{{ ui.icon('check') }} Select this candidate</button>
+    </div>
+  </div>
+</div>
+
+{# "Review your vote" screen, filled in by JavaScript before the final submit. #}
+<div class="modal" id="review" role="dialog" aria-modal="true" aria-labelledby="review-title" hidden>
+  <div class="modal-panel">
+    <p class="eyebrow">Step 2 of 2</p>
+    <h2 id="review-title">Review your vote</h2>
+    <p class="muted small" id="review-intro">Check your choices carefully. After you confirm, your vote is final and can't be changed.</p>
+    <div class="alert alert-warn" id="review-warning" role="alert" hidden></div>
+    <ul class="review-list" id="review-list"></ul>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close-modal>{{ ui.icon('back') }} Back</button>
+      <button type="button" class="btn btn-primary" id="confirmBtn" data-autofocus>{{ ui.icon('check') }} Confirm vote</button>
+    </div>
+  </div>
+</div>
+
+<div class="sending" id="sending" hidden role="alert" aria-live="assertive">
+  <div class="sending-box">
+    <div class="spinner" aria-hidden="true"></div>
+    <p><strong>Recording your vote...</strong></p>
+    <p class="muted small" id="sending-note">Please don't close this page or press Back.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if election.is_open and positions %}<script src="{{ asset('ballot.js') }}" defer></script>{% endif %}
+{% endblock %}

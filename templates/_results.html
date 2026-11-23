@@ -1,0 +1,87 @@
+{# Live results board. Used by results.html (projector page) and the admin "Results" tab.
+   static/results.js fills in the numbers from /api/results every 2 seconds.
+   Set in_admin = true before including it to use smaller headings. #}
+{% import "_macros.html" as ui %}
+{% set rev = ev %}{% set rid = (id_prefix or '') ~ rev.id %}
+<div class="results{{ ' is-final' if rev.status == 'previous' }}" data-results data-event="{{ rev.id }}"
+     data-src="{{ url_for('api_results', event=rev.id) }}"{% if in_admin %} data-manual{% endif %}>
+  <div class="results-head">
+    <div>
+      <p class="eyebrow">{{ 'Final results' if rev.status == 'previous' else 'Live results' }}</p>
+      {% if in_admin or (winners is defined and winners and rev.published) %}<h2 data-r="title">{{ election.title }}</h2>{% else %}<h1 data-r="title">{{ election.title }}</h1>{% endif %}
+    </div>
+    <div class="results-tools">
+      {% if rev.status == 'previous' %}
+      <span class="badge status-previous">{{ ui.icon('lock') }} Voting has ended</span>
+      {% endif %}
+      <span class="live" data-r="live" {% if rev.status == 'previous' %}hidden{% endif %}><span class="dot" aria-hidden="true"></span><span data-r="live-text">Live</span></span>
+      <span class="updated" aria-live="off">Updated <span data-r="updated" class="tnum">–</span></span>
+      {% if not in_admin %}
+      <button type="button" class="btn btn-sm hide-in-projector" data-projector aria-pressed="false">{{ ui.icon('expand') }} Projector mode</button>
+      {% else %}
+      <a class="btn btn-sm" href="{{ url_for('event_results', event_id=rev.id, projector=1) }}" target="_blank" rel="noopener">{{ ui.icon('expand') }} Open projector view</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if rev.status == 'previous' %}
+  {# PREVIOUS event: when voting happened, and the turnout #}
+  <dl class="final-banner">
+    <div><dt>{{ ui.icon('clock') }} Voting started</dt><dd>{{ rev.starts_txt or 'Not recorded' }}</dd></div>
+    <div><dt>{{ ui.icon('lock') }} Voting ended</dt><dd>{{ rev.ends_txt or 'Closed by COMELEC' }}</dd></div>
+    <div><dt>{{ ui.icon('users') }} Voted</dt><dd>{{ rev.ballots }} of {{ rev.registered }} registered
+      ({{ ((100 * rev.ballots / rev.registered)|round|int) if rev.registered else 0 }}% turnout)</dd></div>
+  </dl>
+  {% endif %}
+  <div class="stats">
+    <div class="stat"><span class="stat-label">Votes cast</span><span class="stat-value" data-r="ballots">–</span></div>
+    <div class="stat"><span class="stat-label">Registered voters</span><span class="stat-value" data-r="registered">–</span></div>
+    <div class="stat"><span class="stat-label">Turnout</span><span class="stat-value" data-r="turnout">–</span>
+      <div class="meter" aria-hidden="true"><span data-r="turnout-bar"></span></div></div>
+    <div class="stat"><span class="stat-label">Voting</span><span class="stat-value" data-r="status">–</span></div>
+  </div>
+
+  {# OVERVIEW: one line per position, all positions at a glance (live). Details are below "View more". #}
+  <section class="card overview" aria-labelledby="ov-title-{{ rid }}">
+    <div class="card-head">
+      <h2 id="ov-title-{{ rid }}">{{ ui.icon('chart') }} {{ 'Winners' if rev.status == 'previous' else 'Overview' }}</h2>
+      <span class="muted small">{{ 'Top N per position win.' if rev.status == 'previous' else 'Leaders right now (top N per position).' }}</span>
+    </div>
+    <div class="ov-rows" data-r="ov-rows" aria-live="off">
+      {% for _ in range(3) %}<div class="ov-row skeleton-row" aria-hidden="true"><span class="skel skel-title"></span><span class="skel skel-bar"></span></div>{% endfor %}
+    </div>
+  </section>
+
+  <button type="button" class="btn view-more hide-in-projector" data-r="view-more" aria-expanded="false" aria-controls="details-{{ rid }}">
+    {{ ui.icon('down') }}<span data-label>View more: detailed graphs</span></button>
+
+  <div class="details-collapse" data-r="details" id="details-{{ rid }}" aria-hidden="true">
+  <div class="details-inner">
+  <div class="results-grid" data-r="positions" aria-live="off">
+    {# Skeleton placeholders until the first results arrive (results.js replaces them) #}
+    <p class="sr-only">Loading results...</p>
+    {% for _ in range(3) %}
+    <div class="card skeleton-card" aria-hidden="true">
+      <span class="skel skel-title"></span>
+      {% for _ in range(3) %}<span class="skel-row"><span class="skel skel-av"></span><span class="skel skel-bar"></span></span>{% endfor %}
+      <span class="skel skel-ring"></span>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if in_admin and not no_parallel %}
+  {# ADMIN-ONLY: worker processes / PIDs / threads. Not in the HTML of student or projector pages at all;
+     the numbers come from the admin-only rpc("get_worker_stats"). #}
+  <section class="card parallel hide-in-projector" aria-labelledby="parallel-title" data-r="parallel">
+    <div class="card-head">
+      <h2 id="parallel-title">{{ ui.icon('cpu') }} Parallel processing</h2>
+      <div class="parallel-summary" data-r="parallel-summary"></div>
+    </div>
+    <p class="muted small">Each worker is a separate server process, and each process runs several threads.
+       Ballots handled by different PIDs and threads were processed at the same time.</p>
+    <div class="workers" data-r="workers"></div>
+  </section>
+  {% endif %}
+  </div>
+  </div>
+</div>

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Choose a voting event · BotoKo{% endblock %}
+{% block main_class %}wide events-page{% endblock %}
+
+{# One event card. mine = {event_id: {status, has_voted, reason}} for the logged-in student.
+   CURRENT: Register -> Registration pending -> Vote now -> Voted (view receipt).
+   UPCOMING: what + when + countdown (and Register, so COMELEC can approve before it starts).
+   PREVIOUS: results and winners. #}
+{% macro register_button(ev, label='Register for this event') %}
+<form method="post" action="{{ url_for('event_register', event_id=ev.id) }}" class="inline-form" data-busy="Registering...">
+  {{ ui.csrf() }}<button class="btn btn-primary" type="submit">{{ ui.icon('plus') }} {{ label }}</button></form>
+{% endmacro %}
+
+{% macro my_state(ev, st) %}
+{% if not st %}
+  {{ register_button(ev) }}
+{% elif st.status == 'pending' %}
+  <span class="state-chip is-pending">{{ ui.icon('clock') }} Registration pending</span>
+{% elif st.status == 'rejected' %}
+  <p class="state-note is-rejected">{{ ui.icon('alert') }} Registration rejected: {{ st.reason or 'no reason given' }}</p>
+  {{ register_button(ev, 'Register again') }}
+{% elif st.status == 'removed' %}
+  <p class="state-note is-rejected">{{ ui.icon('alert') }} COMELEC removed you from this event.</p>
+{% elif st.has_voted %}
+  <a class="btn btn-voted" href="{{ url_for('event_receipt', event_id=ev.id) }}">{{ ui.icon('check') }} Voted · view receipt</a>
+{% elif ev.status == 'current' %}
+  <a class="btn btn-primary" href="{{ url_for('event_ballot', event_id=ev.id) }}">{{ ui.icon('ballot') }} Vote now</a>
+{% else %}
+  <a class="btn" href="{{ url_for('event_home', event_id=ev.id) }}">{{ ui.icon('check') }} Registered · see details</a>
+{% endif %}
+{% endmacro %}
+
+{% macro event_card(ev) %}
+{% set st = mine.get(ev.id) %}
+<article class="card event-card is-clickable is-{{ ev.status }}" data-event-id="{{ ev.id }}">
+  <div class="event-card-top">
+    <span class="event-ico" aria-hidden="true">{{ ui.icon('ballot' if ev.status == 'current' else ('clock' if ev.status == 'upcoming' else 'crown')) }}</span>
+    {{ ui.status_badge(ev) }}
+    {% if ev.organization and ev.status != 'upcoming' %}<span class="event-org">{{ ev.organization }}</span>{% endif %}
+  </div>
+  <h3 class="event-name"><a class="stretch" href="{{ url_for('event_home', event_id=ev.id) }}">{{ ev.name }}</a><span class="chev" aria-hidden="true">›</span></h3>
+  {% if ev.description %}<p class="event-desc">{{ ev.description|truncate(160) }}</p>{% endif %}
+  <dl class="event-dates">
+    <div><dt>{{ 'Started' if ev.status != 'upcoming' else 'Voting starts' }}</dt><dd>{{ ev.starts_txt or 'To be announced' }}</dd></div>
+    <div><dt>{{ 'Ended' if ev.status == 'previous' else 'Voting ends' }}</dt><dd>{{ ev.ends_txt or ('When COMELEC closes it' if ev.status == 'current' else '—') }}</dd></div>
+  </dl>
+  {% if ev.status == 'previous' and ev.published %}
+  <p class="event-stat">{{ ui.icon('users') }} {{ ev.ballots }} of {{ ev.registered }} voted
+    ({{ ((100 * ev.ballots / ev.registered)|round|int) if ev.registered else 0 }}% turnout)</p>
+  {# Winners: ONLY here, on a finished event whose official results are published. #}
+  {% set w = winners.get(ev.id) %}
+  {% if w %}
+  <div class="event-winners" data-event-winners="{{ ev.id }}">
+    <p class="ew-title">{{ ui.icon('crown') }} Official winners</p>
+    <ul class="ew-list">
+      {% for p in w %}
+      <li><span class="ew-pos">{{ p.name }}</span>
+        <span class="ew-names">{% if p.winners %}{{ p.winners|map(attribute='name')|join(', ') }}{% elif not p.tied %}<span class="muted">No winner</span>{% endif %}{% if p.tied %}{{ ' · ' if p.winners }}<span class="ew-tie">Tie: {{ p.tied|map(attribute='name')|join(', ') }}</span>{% endif %}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% endif %}
+  <div class="event-actions">
+    {% if ev.status == 'current' %}
+      {{ my_state(ev, st) }}
+      <a class="live-chip" href="{{ url_for('event_results', event_id=ev.id) }}"><span class="live-dot" aria-hidden="true"></span> Live results</a>
+    {% elif ev.status == 'upcoming' %}
+      {{ my_state(ev, st) }}
+      {% if ev.starts_ms %}<span class="countdown-chip" data-countdown="{{ ev.starts_ms }}">{{ ui.icon('clock') }} Starts</span>{% endif %}
+    {% elif ev.results_pending %}
+      <span class="state-chip is-pending">{{ ui.icon('clock') }} Results will be announced soon</span>
+      {% if st and st.has_voted %}<a class="btn" href="{{ url_for('event_receipt', event_id=ev.id) }}">{{ ui.icon('ballot') }} My receipt</a>{% endif %}
+    {% else %}
+      <a class="btn btn-primary" href="{{ url_for('event_results', event_id=ev.id) }}">{{ ui.icon('crown') }} View results &amp; winners</a>
+      {% if st and st.has_voted %}<a class="receipt-link" href="{{ url_for('event_receipt', event_id=ev.id) }}">My receipt</a>{% endif %}
+    {% endif %}
+  </div>
+</article>
+{% endmacro %}
+
+{% block content %}
+{% set first = 'current' if groups.current or not (groups.upcoming or groups.previous) else ('upcoming' if groups.upcoming else 'previous') %}
+<section class="events-hero">
+  <p class="eyebrow">Hi, {{ g.student.full_name.split(' ')[0] }}!</p>
+  <h1>Choose a voting event</h1>
+  <p class="muted">Register for an event with one tap, vote when it is open, or check the results and winners of past elections.</p>
+</section>
+
+<nav class="tabs event-tabs" role="tablist" aria-label="Voting events" data-tabs data-default="{{ first }}">
+  {% for key, label, ico in [('current', 'Current', 'ballot'), ('upcoming', 'Upcoming', 'clock'), ('previous', 'Previous', 'chart')] %}
+  <a class="tab" role="tab" id="tab-{{ key }}" href="#{{ key }}" aria-controls="panel-{{ key }}"
+     aria-selected="{{ 'true' if key == first else 'false' }}">{{ ui.icon(ico) }}<span>{{ label }}</span><span class="tab-count">{{ groups[key]|length }}</span></a>
+  {% endfor %}
+</nav>
+
+{% for key, empty in [('current', 'No voting is open right now. Check the Upcoming tab for the next event.'),
+                       ('upcoming', 'No upcoming events yet. COMELEC will announce the next one.'),
+                       ('previous', 'No finished events yet. Results appear here after voting ends.')] %}
+<section class="tab-panel {{ 'is-active' if key == first }}" id="panel-{{ key }}" role="tabpanel" aria-labelledby="tab-{{ key }}">
+  <h2 class="sr-only">{{ key|capitalize }} events</h2>
+  {% if groups[key] %}
+  <div class="event-grid">
+    {% for ev in groups[key] %}{{ event_card(ev) }}{% endfor %}
+  </div>
+  {% else %}
+  <div class="card empty">{{ ui.icon('inbox') }}{{ empty }}
+    {% if key == 'current' %}
+    <div class="empty-actions">
+      <a class="btn btn-primary" href="{{ url_for('my_account') }}">{{ ui.icon('users') }} My Account</a>
+      {% if groups.upcoming %}<a class="btn" href="#upcoming">{{ ui.icon('clock') }} See upcoming events</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

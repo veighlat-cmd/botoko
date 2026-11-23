@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Admin · BotoKo{% endblock %}
+{% block content %}
+{# Shown when there are no voting events yet. #}
+{% include "_admin_warning.html" %}
+<div class="admin-first-head">
+  <p class="eyebrow">COMELEC admin</p>
+  <form method="post" action="{{ url_for('logout') }}" class="admin-logout" data-confirm="Log out of the admin dashboard?" data-confirm-ok="Log out">
+    {{ ui.csrf() }}<button type="submit" class="btn btn-sm">{{ ui.icon('logout') }} Log out</button></form>
+</div>
+<h1>Create your first voting event</h1>
+<p class="muted">An event is one election (for example "SSC Election 2026"), with its own positions, candidates,
+  registered voters and results. Several events can be open at the same time.</p>
+<section class="card">
+  <form method="post" action="{{ url_for('admin_event_create') }}" class="row" data-busy="Creating...">
+    {{ ui.csrf() }}<input type="hidden" name="tab" value="ballot">
+    {% set e = none %}{% set pfx = 'first' %}{% include "_event_form.html" %}
+    <button class="btn btn-primary" type="submit">{{ ui.icon('plus') }} Create event</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,23 @@
+{
+  "server": "BotoKo: 4 CPU cores detected -> 4 worker processes x 8 threads = 32 requests at the same time",
+  "logged_in": 999,
+  "capture": {
+    "votes_sent_by_clients_at_capture": 711,
+    "of": 999,
+    "ballots_shown_in_panel": 565,
+    "worker_cards_shown": 4,
+    "panel_text": "Parallel processing\n4 WORKER PROCESSES\n32 THREADS USED\n\nEach worker is a separate server process, and each process runs several threads. Ballots handled by different PIDs and threads were processed at the same time.\n\nWorker 1\nPID 14732\n153\nballots\n8\nthreads\n28%\nshare\nWorker 2\nPID 18916\n139\nballots\n8\nthreads\n25%\nshare\nWorker 3\nPID 21100\n133\nballots\n8\nthreads\n24%\nshare\nWorker 4\nPID 22852\n140\nballots"
+  },
+  "burst": {
+    "votes": 999,
+    "accepted": 999,
+    "seconds": 12.42
+  },
+  "captured_during_run": true,
+  "db_after": {
+    "ballots": 1000,
+    "duplicates": 0,
+    "worker_pids": 4,
+    "expected_ballots": 1000
+  }
+}

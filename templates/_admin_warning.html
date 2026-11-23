@@ -1,0 +1,20 @@
+{# Admin dashboard only: weak ADMIN_PASSWORD warning + the always-visible Log out button. #}
+{% import "_macros.html" as ui %}
+{% if ADMIN_PASSWORD_WEAK %}
+<div class="alert alert-warn admin-pw-warning" role="alert">{{ ui.icon('alert') }}
+  <div>
+    <strong>Change the admin password before the real election.</strong>
+    <p>The admin password is weak (a common one like "admin123", or shorter than 10 characters). Anyone who guesses it
+      can open this dashboard. Use a long password that only COMELEC knows.</p>
+    <details class="pw-howto">
+      <summary>How to change it</summary>
+      <ul>
+        <li><b>This laptop:</b> open <code>run-local.ps1</code> and change the line
+          <code>$env:ADMIN_PASSWORD = "admin123"</code> to your own long password, then restart BotoKo.
+          (Or type <code>$env:ADMIN_PASSWORD = "your-long-password"</code> in the terminal before <code>.\run-local.ps1</code>.)</li>
+        <li><b>Render:</b> Dashboard → your <i>botoko</i> service → <i>Environment</i> → <code>ADMIN_PASSWORD</code> → Save. The app restarts with the new password.</li>
+      </ul>
+    </details>
+  </div>
+</div>
+{% endif %}

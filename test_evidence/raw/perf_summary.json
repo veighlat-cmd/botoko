@@ -1,0 +1,138 @@
+{
+  "summary": [
+    {
+      "setup": "Sequential (1 worker x 1 thread)",
+      "votes": 100,
+      "runs": 3,
+      "total_s": 2.291,
+      "votes_per_s": 43.8,
+      "avg_ms": 1302.3,
+      "p95_ms": 2175.2,
+      "errors": 0,
+      "db_ok": true,
+      "dups": 0
+    },
+    {
+      "setup": "Concurrent (auto: workers x threads)",
+      "votes": 100,
+      "runs": 3,
+      "total_s": 1.177,
+      "votes_per_s": 93.4,
+      "avg_ms": 796.5,
+      "p95_ms": 1121.5,
+      "errors": 0,
+      "db_ok": true,
+      "dups": 0
+    },
+    {
+      "setup": "Sequential (1 worker x 1 thread)",
+      "votes": 500,
+      "runs": 3,
+      "total_s": 10.967,
+      "votes_per_s": 45.9,
+      "avg_ms": 1953.1,
+      "p95_ms": 2454.6,
+      "errors": 0,
+      "db_ok": true,
+      "dups": 0
+    },
+    {
+      "setup": "Concurrent (auto: workers x threads)",
+      "votes": 500,
+      "runs": 3,
+      "total_s": 5.1,
+      "votes_per_s": 101.6,
+      "avg_ms": 942.6,
+      "p95_ms": 1920.8,
+      "errors": 0,
+      "db_ok": true,
+      "dups": 0
+    },
+    {
+      "setup": "Sequential (1 worker x 1 thread)",
+      "votes": 1000,
+      "runs": 3,
+      "total_s": 24.021,
+      "votes_per_s": 41.7,
+      "avg_ms": 2291.4,
+      "p95_ms": 2894.4,
+      "errors": 0,
+      "db_ok": true,
+      "dups": 0
+    },
+    {
+      "setup": "Concurrent (auto: workers x threads)",
+      "votes": 1000,
+      "runs": 3,
+      "total_s": 10.511,
+      "votes_per_s": 96.9,
+      "avg_ms": 1014.7,
+      "p95_ms": 1973.9,
+      "errors": 0,
+      "db_ok": true,
+      "dups": 0
+    }
+  ],
+  "conditions": [
+    [
+      "Date",
+      "2026-11-18 20:06"
+    ],
+    [
+      "CPU model",
+      "AMD Ryzen 3 7320U with Radeon Graphics"
+    ],
+    [
+      "CPU cores",
+      "4 physical / 8 logical"
+    ],
+    [
+      "RAM",
+      "7.3 GB"
+    ],
+    [
+      "Operating system",
+      "Windows 11 (10.0.26200)"
+    ],
+    [
+      "Python",
+      "3.14.5"
+    ],
+    [
+      "Web server",
+      "serve.py (Waitress, worker processes sharing one socket) - the same launcher as run-local.ps1"
+    ],
+    [
+      "Sequential setup",
+      "WEB_CONCURRENCY=1, THREADS=1 -> 1 worker process x 1 thread = 1 request at a time"
+    ],
+    [
+      "Concurrent setup",
+      "auto-detected: 4 worker processes x 8 threads = 32 requests at a time (DB pool 8 per worker)"
+    ],
+    [
+      "Database",
+      "PostgreSQL 18.6, local cluster port 5433, database botoko_test (dropped and re-created from schema.sql before EVERY run); botoko_live not used"
+    ],
+    [
+      "Client",
+      "Python script on the same laptop; 100 client threads released at the same instant (fewer when there are fewer votes), each vote = one RPC cast_vote request on a new connection"
+    ],
+    [
+      "What is timed",
+      "Only the voting: all students log in first (not timed); total time = first vote sent -> last answer received"
+    ],
+    [
+      "Votes",
+      "Each synthetic student TEST-xxxx votes once: President, Vice President (skipped by every 7th), 1-3 Councilors"
+    ],
+    [
+      "Repeats",
+      "3 runs per setup and workload; the table shows the average of the 3 runs"
+    ],
+    [
+      "Note",
+      "Client and server share the same CPU, so the client's own work is included in the timings"
+    ]
+  ]
+}

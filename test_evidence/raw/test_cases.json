@@ -1,0 +1,222 @@
+[
+  {
+    "id": "TC-01",
+    "title": "Valid login",
+    "steps": "Open the login page, enter Voter ID TEST-0001 and the correct password, submit.",
+    "expected": "Logged in; the 'Choose a voting event' page (/events) is shown.",
+    "actual": "HTTP 200, landed on /events, 'Choose a voting event' shown: True",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 1.01
+  },
+  {
+    "id": "TC-02",
+    "title": "Wrong password",
+    "steps": "Login with Voter ID TEST-0002 and a wrong password; then open /events.",
+    "expected": "Error message shown; not logged in (/events sends back to the login page).",
+    "actual": "HTTP 200, stayed on /, error shown: True; /events -> /?next=/events (login form shown: True)",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 0.56
+  },
+  {
+    "id": "TC-03",
+    "title": "Unregistered Voter ID",
+    "steps": "Login with Voter ID TEST-9999 (no such account) and any password; open /events.",
+    "expected": "Error message shown; not logged in.",
+    "actual": "HTTP 200, error shown: True; /events -> /?next=/events (login form shown: True)",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 0.04
+  },
+  {
+    "id": "TC-04",
+    "title": "Unapproved student (auto-approve OFF)",
+    "steps": "TEST-0004 logs in, taps Register on 'TEST Approval Election' (auto-approve OFF), then opens its ballot and also tries RPC cast_vote.",
+    "expected": "Registration is PENDING; ballot not available ('pending approval' message); vote refused and not saved.",
+    "actual": "register -> 'PENDING' message: True, DB status: pending; ballot -> /events#current with 'pending approval': True; RPC cast_vote -> error -32015 'Your registration for this event is still pending approval.'; ballots saved: 0",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 0.81
+  },
+  {
+    "id": "TC-05",
+    "title": "Cast a vote",
+    "steps": "TEST-0005 logs in, opens the ballot of 'TEST Main Election', submits the ballot form (President, Vice President, 2 Councilors).",
+    "expected": "Vote saved in the database (1 ballot, 4 vote rows); the receipt page is shown.",
+    "actual": "HTTP 200, landed on /e/1/receipt, receipt shown: True, receipt code 5801B894; DB: 1 ballot, 4 vote rows",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 0.71
+  },
+  {
+    "id": "TC-06",
+    "title": "Duplicate vote in the same event",
+    "steps": "TEST-0005 (already voted in TC-05) submits the ballot form again, then tries RPC cast_vote too.",
+    "expected": "Both rejected ('already voted'); still exactly 1 ballot and 4 vote rows in the database.",
+    "actual": "form -> /e/1/receipt, 'already voted' shown: True; RPC -> error -32011 'You have already voted.'; DB: 1 ballot, 4 vote rows",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 0.73
+  },
+  {
+    "id": "TC-07",
+    "title": "Vote in an upcoming or closed event",
+    "steps": "TEST-0007 (registered in 'TEST Upcoming Election' and 'TEST Closed Election') opens both ballots and tries to vote in both (ballot form + RPC cast_vote).",
+    "expected": "No ballot (no candidates to choose) for either event; every vote attempt refused; nothing saved.",
+    "actual": "upcoming: ballot page has candidates: False; form vote -> /e/3/ballot; RPC -> error -32016 'Voting has not started yet for this event. Your ballot was not recorded.'; saved: 0 | closed: ballot page has candidates: False; form vote -> /e/4/ballot; RPC -> error -32010 'Voting is closed for this event. Your ballot was not recorded.'; saved: 0",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 0.81
+  },
+  {
+    "id": "TC-08",
+    "title": "More candidates than allowed",
+    "steps": "TEST-0008 submits the ballot with 4 Councilors (the position allows up to 3): ballot form and RPC cast_vote.",
+    "expected": "Blocked with 'Too many candidates' message; nothing saved.",
+    "actual": "form -> /e/1/ballot, 'Too many candidates chosen for one position (at most 3)' shown: True; RPC -> error -32012 'Too many candidates chosen for one position (at most 3).'; ballots saved: 0",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 0.62
+  },
+  {
+    "id": "TC-09",
+    "title": "Expired / invalid session submits a vote",
+    "steps": "(a) a browser with a forged session cookie submits the ballot form; (b) TEST-0009 logs in, then the session is invalidated on the server (password changed elsewhere: session_version + 1) and the open ballot is submitted; (c) RPC cast_vote without a session.",
+    "expected": "Each time: sent to the login page / 'not logged in'; no vote saved.",
+    "actual": "(a) forged cookie -> /?next=/e/1/vote, login form: True; (b) expired session -> /, login form + 'logged out' message: True; (c) RPC -> error -32001 'Please log in first.'; ballots saved: TEST-0009 0, student #1 0",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 0.67
+  },
+  {
+    "id": "TC-10",
+    "title": "Receipt download PNG and JPG",
+    "steps": "TEST-0005 (voted in TC-05) downloads /receipt/<code>.png and .jpg.",
+    "expected": "HTTP 200, valid PNG and JPEG images (open with an image library), about 1080 px wide.",
+    "actual": "png: HTTP 200, image/png, PNG 1080x2076, 200235 bytes, file name \"BotoKo-receipt-TEST-Main-Election-5801B894.png\" | jpg: HTTP 200, image/jpeg, JPEG 1080x2076, 286570 bytes, file name \"BotoKo-receipt-TEST-Main-Election-5801B894.jpg\"",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 0.78
+  },
+  {
+    "id": "TC-11",
+    "title": "Live results update after a vote from a second client",
+    "steps": "Client A (TEST-0011) reads the live results (RPC get_results); client B (TEST-0012, separate session) votes; A reads the results again after 2 s.",
+    "expected": "A's second reading shows 1 more ballot and +1 vote for the candidate B chose.",
+    "actual": "B's vote: recorded, receipt 4CB53415; A before: 1 ballots, candidate 0 votes; A after: 2 ballots, candidate 1 votes",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 2.68
+  },
+  {
+    "id": "TC-12",
+    "title": "Admin login",
+    "steps": "On the same login page, enter Voter ID 'admin' and the (test) admin password.",
+    "expected": "The COMELEC admin dashboard (/admin) is shown.",
+    "actual": "HTTP 200, landed on /admin, dashboard shown: True",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 0.49
+  },
+  {
+    "id": "TC-13",
+    "title": "100 simultaneous votes",
+    "steps": "100 different students (TEST-0101..TEST-0200) log in first; then all 100 send RPC cast_vote at the same instant (100 client threads released together). Then the database is queried.",
+    "expected": "All 100 votes accepted; exactly 100 ballots, 0 duplicates, every candidate's count = what was sent.",
+    "actual": "logins ok 100/100; accepted 100/100 in 0.70 s, errors 0; DB: 100 ballots (0 duplicates), event total 2 -> 102; tally matches what was sent: True (387/387 vote rows); handled by 4 worker processes",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 6.55
+  },
+  {
+    "id": "TC-14",
+    "title": "Server unavailable",
+    "steps": "TEST-0014 logs in (has a session + token); the server is stopped; the client sends RPC cast_vote; the database is checked.",
+    "expected": "The request fails (connection refused); no vote recorded.",
+    "actual": "server stopped; request failed: ConnectionError; TEST-0014 ballots: 0; total ballots 165 -> 165",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 3.78
+  },
+  {
+    "id": "TC-15",
+    "title": "Admin pending list shows a newly registered student automatically (no refresh)",
+    "steps": "Admin opens the Accounts tab, filters 'Pending' and searches 'tc15'. A NEW student creates an account; another new student (name not matching the search) too. Then a verified student registers for the approval-required event (Registrations tab). Finally the first new account is approved from ANOTHER admin session.",
+    "expected": "Within a few seconds the new student's row (Approve / Reject) appears by itself, the page is not reloaded, the filter/search stay (the non-matching row is hidden), no duplicate rows; the new registration row appears too; the row approved elsewhere disappears from the pending list.",
+    "actual": "account row appeared after 2.4 s (badge 0 -> 2), Approve/Reject buttons: True; non-matching new row present but hidden by the search: True; no duplicates after 2 more polls: True; filter + search kept: True; page not reloaded: True; registration row appeared after 2.3 s; approved in another admin session -> row removed after 3.4 s",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 25.1
+  },
+  {
+    "id": "TC-16",
+    "title": "Waiting student is redirected to events automatically after approval (no click)",
+    "steps": "A new student creates an account and logs in on a phone-size screen: the 'waiting for verification' page. The admin verifies the account (from the admin side). Nothing is clicked on the student's screen. A second waiting student (desktop) is rejected with a reason.",
+    "expected": "Within a few seconds the student sees 'You're approved!' and is taken to the events page by itself; the rejected student sees the rejection reason by itself.",
+    "actual": "phone: waiting page shown: True; after approval 'You're approved!' after 4.4 s and the events page ('Choose a voting event': True) after 5.6 s, without any click; desktop: rejection reason shown after 4.4 s without any click",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 12.95
+  },
+  {
+    "id": "TC-17",
+    "title": "Admin ends voting early; ballot closes and new votes are rejected",
+    "steps": "'TEST End-Early Election' is open (ends in 3 days, auto-publish OFF). TEST-0021 votes. The admin opens the event page, clicks 'End voting now' and confirms. Then TEST-0022 opens the ballot and tries to vote (form + RPC).",
+    "expected": "Confirmation 'End voting now? Students will no longer be able to vote. This cannot be undone.'; the event becomes Previous/closed with the end time = now, the action is logged (who + when), no reopen button; the ballot has no candidates; the vote is rejected with a clear message; TEST-0021's vote is still counted.",
+    "actual": "button 'End voting now' -> confirmation 'End voting now? Students will no longer be able to vote. This cannot be undone.'; DB: manual=closed, end time set to now: True; server log line 'VOTING ENDED by admin ... for event 5': True; admin page shows 'Voting has ended': True, reopen button: False; ballot has candidates: False; form vote -> message shown: True; RPC -> error -32010 'Voting is closed for this event. Your ballot was not recorded.'; TEST-0021 voted before: True; ballots in the event: 1",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 6.95
+  },
+  {
+    "id": "TC-18",
+    "title": "Vote submitted after admin ended voting is rejected; no duplicate or partial ballots",
+    "steps": "60 students of 'TEST Race Election' log in; all 60 send their vote at the same instant and, while the votes are being saved, the admin ends voting (RPC close_voting). Afterwards 5 of the rejected students try again.",
+    "expected": "Every vote is either fully counted or cleanly rejected ('Voting is closed'); ballots stored = votes accepted, 0 duplicates, every stored ballot has all its vote rows; every vote sent after the close is rejected.",
+    "actual": "close_voting answered ok when 59 of 60 votes had been sent; accepted 52, rejected 8 (all with -32010 'Voting is closed': True); DB: 52 ballots, 0 duplicates, has_voted flags 52, every stored ballot complete: True; 5 votes sent after the close -> all rejected: True; ballots still 52",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 5.2
+  },
+  {
+    "id": "TC-19",
+    "title": "Winners appear after ending voting according to the auto-publish setting",
+    "steps": "(A) 'TEST Auto-Publish Election' (auto-publish ON): 10 students vote; a student keeps its live results page open; the admin ends voting. (B) 'TEST End-Early Election' (auto-publish OFF, ended in TC-17): a student opens its results page; then the admin clicks 'Publish official results'.",
+    "expected": "(A) right after ending: results official, the open page shows the winners by itself (no reload by the student). (B) before publishing: no numbers ('announced soon'), RPC refuses (-32021); after publishing the open page shows the winners by itself within a few seconds.",
+    "actual": "(A) 10 votes cast; auto-publish ON: open live page showed the winners 1.9 s after the admin ended voting (no reload by the student); RPC get_results: final=True, 5 winner marks. (B) auto-publish OFF: before publishing RPC -> error -32021, page shows 'announced soon' without numbers: True; after 'Publish official results' (HTTP 200) the open page showed the winners after 3.5 s; RPC now final=True",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 14.44
+  },
+  {
+    "id": "TC-20",
+    "title": "Admin dashboard can switch between multiple events and shows the correct results for each",
+    "steps": "Admin logs in (dashboard). The 'Results by event' selector lists all events with their status. The admin switches to a finished event, an upcoming event and the main open event; then presses Back and reloads. Also checked on a phone-size screen.",
+    "expected": "Default = an open event; every switch updates the results/turnout without a full reload and shows that event's own numbers (= database); the upcoming event shows 'Voting has not started yet'; the URL keeps ?results=<id> (Back and refresh keep it); live updates follow only the selected event; the Parallel processing panel is not duplicated; no sideways scroll on a phone.",
+    "actual": "selector lists 7 of 7 events, each labelled with its status: True; default selection: event 1 (current); e17: switched + correct: True (votes cast shown 1 = database 1), in URL: True; upcoming: switched + correct: True (empty state 'Voting has not started yet'), in URL: True; main: switched + correct: True (votes cast shown 102 = database 102), in URL: True; no full page reload: True; live updates only for the selected event: True (2 calls in 5 s); Back -> previous selection: True; refresh keeps it: True; Parallel processing panel only in the Results tab: True; phone 390 px: selector visible, no sideways scroll: True",
+    "result": "PASS",
+    "date": "2026-11-19",
+    "note": "",
+    "seconds": 14.88
+  }
+]

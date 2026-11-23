@@ -1,0 +1,29 @@
+{# Class-list import form. Used in the admin Students tab and on the "please fix" page
+   (where `text` holds what was sent, so the admin can correct it and try again). #}
+{% import "_macros.html" as ui %}
+<form method="post" action="{{ url_for('admin_accounts') }}" enctype="multipart/form-data" class="stack"
+      data-busy="Checking the list...">
+  {{ ui.csrf() }}<input type="hidden" name="tab" value="students"><input type="hidden" name="mode" value="list">
+  <div class="field">
+    <label for="students-list">Paste the class list</label>
+    <textarea id="students-list" name="students" rows="6" spellcheck="false" aria-describedby="students-hint"
+              placeholder="{{ SCHOOL_NO_EXAMPLE }}, Juan Dela Cruz, BSIT, College of Computing Studies, 3, A&#10;23-1-00480, &quot;Santos, Maria Clara&quot;, BSIT, College of Computing Studies, 3, A">{{ text or '' }}</textarea>
+    <p class="hint" id="students-hint">One student per line:
+      <code>school_student_no, full_name, course, department, year, section</code>.
+      The header row is optional. Put names that contain a comma in "quotes". Year is 1 to {{ MAX_YEAR }}.</p>
+  </div>
+  <div class="field">
+    <label for="csv-file">…or upload a .csv file (same columns)</label>
+    <input id="csv-file" name="csv_file" type="file" accept=".csv,text/csv">
+  </div>
+  <div class="alert alert-info">{{ ui.icon('info') }}<p>BotoKo creates a <b>Voter ID</b> and a random password for each student.
+    They are shown <b>only once</b> on the next page (download the CSV or print the voter slips).
+    If any row has a problem, nothing is created and you'll see which rows to fix.</p></div>
+  {% if ev is defined and ev %}
+  {# Register everyone on the list in the selected event (also students who already have an account). #}
+  <input type="hidden" name="event_id" value="{{ ev.id }}">
+  <label class="check-line"><input type="checkbox" name="register_event" value="1" checked>
+    Also register these students in <b>{{ ev.name }}</b> (students who already have an account are registered too)</label>
+  {% endif %}
+  <button class="btn btn-primary btn-block" type="submit">{{ ui.icon('check') }} Check &amp; create accounts</button>
+</form>

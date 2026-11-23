@@ -1,0 +1,36 @@
+  Sequential (1 worker x 1 thread)         100 votes  run 1:    2.18 s     46.0 votes/s  avg  1243.6 ms  p95  2078.4 ms  errors 0  DB ok True (100 ballots, 0 dup, 1 PIDs)
+  Concurrent (auto: workers x threads)     100 votes  run 1:    1.24 s     80.9 votes/s  avg   849.8 ms  p95  1192.1 ms  errors 0  DB ok True (100 ballots, 0 dup, 4 PIDs)
+  Sequential (1 worker x 1 thread)         100 votes  run 2:    2.25 s     44.5 votes/s  avg  1261.3 ms  p95  2137.8 ms  errors 0  DB ok True (100 ballots, 0 dup, 1 PIDs)
+  Concurrent (auto: workers x threads)     100 votes  run 2:    1.55 s     64.4 votes/s  avg  1031.7 ms  p95  1468.2 ms  errors 0  DB ok True (100 ballots, 0 dup, 4 PIDs)
+  Sequential (1 worker x 1 thread)         100 votes  run 3:    2.45 s     40.8 votes/s  avg  1402.1 ms  p95  2309.5 ms  errors 0  DB ok True (100 ballots, 0 dup, 1 PIDs)
+  Concurrent (auto: workers x threads)     100 votes  run 3:    0.74 s    134.8 votes/s  avg   507.9 ms  p95   704.2 ms  errors 0  DB ok True (100 ballots, 0 dup, 4 PIDs)
+  Sequential (1 worker x 1 thread)         500 votes  run 1:   10.49 s     47.6 votes/s  avg  1907.4 ms  p95  2167.0 ms  errors 0  DB ok True (500 ballots, 0 dup, 1 PIDs)
+  Concurrent (auto: workers x threads)     500 votes  run 1:    5.95 s     84.0 votes/s  avg  1057.9 ms  p95  2412.3 ms  errors 0  DB ok True (500 ballots, 0 dup, 4 PIDs)
+  Sequential (1 worker x 1 thread)         500 votes  run 2:   10.04 s     49.8 votes/s  avg  1827.2 ms  p95  2024.0 ms  errors 0  DB ok True (500 ballots, 0 dup, 1 PIDs)
+  Concurrent (auto: workers x threads)     500 votes  run 2:    3.85 s    129.8 votes/s  avg   728.6 ms  p95  1296.1 ms  errors 0  DB ok True (500 ballots, 0 dup, 4 PIDs)
+  Sequential (1 worker x 1 thread)         500 votes  run 3:   12.37 s     40.4 votes/s  avg  2124.7 ms  p95  3172.7 ms  errors 0  DB ok True (500 ballots, 0 dup, 1 PIDs)
+  Concurrent (auto: workers x threads)     500 votes  run 3:    5.50 s     91.0 votes/s  avg  1041.3 ms  p95  2054.0 ms  errors 0  DB ok True (500 ballots, 0 dup, 4 PIDs)
+  Sequential (1 worker x 1 thread)        1000 votes  run 1:   23.15 s     43.2 votes/s  avg  2219.5 ms  p95  2920.5 ms  errors 0  DB ok True (1000 ballots, 0 dup, 1 PIDs)
+  Concurrent (auto: workers x threads)    1000 votes  run 1:    9.39 s    106.5 votes/s  avg   901.8 ms  p95  1777.1 ms  errors 0  DB ok True (1000 ballots, 0 dup, 4 PIDs)
+  Sequential (1 worker x 1 thread)        1000 votes  run 2:   24.64 s     40.6 votes/s  avg  2330.3 ms  p95  2842.2 ms  errors 0  DB ok True (1000 ballots, 0 dup, 1 PIDs)
+  Concurrent (auto: workers x threads)    1000 votes  run 2:   12.62 s     79.3 votes/s  avg  1217.0 ms  p95  2414.8 ms  errors 0  DB ok True (1000 ballots, 0 dup, 4 PIDs)
+  Sequential (1 worker x 1 thread)        1000 votes  run 3:   24.27 s     41.2 votes/s  avg  2324.3 ms  p95  2920.4 ms  errors 0  DB ok True (1000 ballots, 0 dup, 1 PIDs)
+  Concurrent (auto: workers x threads)    1000 votes  run 3:    9.53 s    104.9 votes/s  avg   925.4 ms  p95  1729.9 ms  errors 0  DB ok True (1000 ballots, 0 dup, 4 PIDs)
+Traceback (most recent call last):
+  File "c:\Users\cathyrine\Downloads\botoko\botoko\tests\perf_compare.py", line 205, in <module>
+    main()
+    ~~~~^^
+  File "c:\Users\cathyrine\Downloads\botoko\botoko\tests\perf_compare.py", line 195, in main
+    summary = write_outputs(runs, conds, args.loads)
+  File "c:\Users\cathyrine\Downloads\botoko\botoko\tests\perf_compare.py", line 152, in write_outputs
+    wb.save(kit.EVIDENCE / "Performance_Results.xlsx")
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cathyrine\AppData\Local\Programs\Python\Python314\Lib\site-packages\openpyxl\workbook\workbook.py", line 386, in save
+    save_workbook(self, filename)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\cathyrine\AppData\Local\Programs\Python\Python314\Lib\site-packages\openpyxl\writer\excel.py", line 291, in save_workbook
+    archive = ZipFile(filename, 'w', ZIP_DEFLATED, allowZip64=True)
+  File "C:\Users\cathyrine\AppData\Local\Programs\Python\Python314\Lib\zipfile\__init__.py", line 1454, in __init__
+    self.fp = io.open(file, filemode)
+              ~~~~~~~^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: 'C:\\Users\\cathyrine\\Downloads\\botoko\\botoko\\test_evidence\\Performance_Results.xlsx'

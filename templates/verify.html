@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Verify a receipt · BotoKo{% endblock %}
+{% block content %}
+{# Public page. It only says IF a ballot with this code was recorded and WHEN.
+   It never shows the votes or who the voter is (ballot secrecy). #}
+<p class="eyebrow">BotoKo</p>
+<h1>Verify a voting receipt</h1>
+<p class="muted">Enter the verification code printed on a voting receipt to check that the ballot was recorded.</p>
+
+<section class="card">
+  <form method="get" action="{{ url_for('verify') }}" class="row verify-form">
+    <div class="field grow">
+      <label for="code">Verification code</label>
+      <input id="code" name="code" value="{{ typed }}" required maxlength="20" autocomplete="off" spellcheck="false"
+             autocapitalize="characters" placeholder="e.g. 8F3A2C1D" class="mono" {% if not result %}autofocus{% endif %}>
+    </div>
+    <button class="btn btn-primary" type="submit">{{ ui.icon('search') }} Verify</button>
+  </form>
+
+  {% if result %}
+  <div class="verify-result" role="status" aria-live="polite">
+    {% if result.found %}
+    <div class="alert alert-ok">{{ ui.icon('check') }}
+      <p><strong>Ballot recorded.</strong>A ballot with code <span class="mono">{{ code }}</span> was recorded on
+        <b>{{ result.cast_at }}</b> (Philippine time){% if result.event %} in <b>{{ result.event }}</b>{% endif %}.</p></div>
+    {% elif result.bad_format %}
+    <div class="alert alert-warn">{{ ui.icon('alert') }}
+      <p><strong>That doesn't look like a verification code.</strong>Codes have 8 letters and numbers (0-9, A-F), e.g. 8F3A2C1D.</p></div>
+    {% else %}
+    <div class="alert alert-error">{{ ui.icon('x') }}
+      <p><strong>No ballot found with this code.</strong>Check the code on the receipt and try again, or ask your COMELEC officer.</p></div>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+<p class="hint">{{ ui.icon('lock') }} For ballot secrecy, this page never shows how anyone voted or who the voter is.</p>
+{% endblock %}

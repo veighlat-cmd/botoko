@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Voter Profile · BotoKo{% endblock %}
+{% block content %}
+{# Read-only: students can't edit their own details (COMELEC keeps the official list). #}
+<p class="eyebrow">My account</p>
+<h1>Voter Profile</h1>
+<dl class="facts facts-compact">
+  <div class="wide"><dt>Full name</dt><dd>{{ s.full_name }}</dd></div>
+  <div><dt>Voter ID</dt><dd class="mono">{{ s.student_no }}</dd></div>
+  <div><dt>School student number</dt><dd class="mono">{{ s.school_student_no or 'Not set' }}</dd></div>
+  <div><dt>Course</dt><dd>{{ s.course or 'Not set' }}</dd></div>
+  <div class="wide"><dt>School/Department</dt><dd>{{ s.department or 'Not set' }}</dd></div>
+  <div><dt>Year and section</dt><dd>{% if s.year_level %}{{ s.year_level }}-{{ s.section }}{% else %}Not set{% endif %}</dd></div>
+</dl>
+<div class="alert alert-info">{{ ui.icon('info') }}<p>To correct your details, please contact the COMELEC/admin.</p></div>
+{% endblock %}

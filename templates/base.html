@@ -1,0 +1,143 @@
+{% import "_macros.html" as ui %}
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#070a13">
+  {# Dark by default; the sun/moon button switches to light (remembered on this device). Set before the
+     page is drawn, so there is no flash of the wrong colours. #}
+  <script>try { document.documentElement.setAttribute('data-theme', localStorage.getItem('botoko-theme') === 'light' ? 'light' : 'dark'); } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }</script>
+  {# Page-change animation (CSS @view-transition): if the screen size changes during it (phone keyboard, rotation),
+     the browser skips the animation; that is harmless, so don't report it as an error. #}
+  <script>
+    ['pageswap', 'pagereveal'].forEach(function (t) {
+      window.addEventListener(t, function (e) {
+        var vt = e.viewTransition;
+        if (vt) [vt.ready, vt.finished, vt.updateCallbackDone].forEach(function (p) { if (p && p.catch) p.catch(function () {}); });
+      });
+    });
+  </script>
+  {# CSRF token for remote procedure calls (static/rpc.js sends it in the X-CSRF-Token header) #}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  {# Who is logged in in this browser right now (app.js tells the other open tabs when it changes). #}
+  {% set who = who_am_i() %}<meta name="botoko-who" content="{{ who[0] }}" data-label="{{ who[1] }}">
+  <title>{% block title %}BotoKo{% endblock %}</title>
+  <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+  <link rel="icon" href="{{ asset('favicon-32.png') }}" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
+  <link rel="preload" href="{{ asset('fonts/inter-latin.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ asset('style.css') }}">
+  <link rel="stylesheet" href="{{ asset('theme.css') }}">
+  <link rel="stylesheet" href="{{ asset('dash.css') }}">
+  {# Mark that JavaScript works, so CSS can hide things that only make sense with JS (e.g. tabs). #}
+  <script>document.documentElement.classList.remove('no-js'); document.documentElement.classList.add('js');</script>
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %} page-{{ (request.endpoint or 'page')|replace('.', '-') }}{% if session.get('student_id') and not session.get('is_admin') %} has-account-menu{% endif %}">
+  {% include "_icons.html" %}
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="{{ url_for('admin') if session.get('is_admin') else (url_for('index') if session.get('student_id') else url_for('login')) }}" aria-label="BotoKo home">{{ ui.logo(34) }}<span>Boto<b>Ko</b></span></a>
+      {# "Home" = the event list ("Choose a voting event"). #}
+      {% set is_admin = session.get('is_admin') %}
+      {% set is_student = session.get('student_id') and not is_admin %}
+      <nav class="nav" aria-label="Main">
+        {% if is_student and request.endpoint != 'index' %}{# not on the event list itself #}
+        <a href="{{ url_for('index') }}" data-tip="Events" {% if request.endpoint == 'index' %}aria-current="page"{% endif %}>{{ ui.icon('home') }}<span>Events</span></a>
+        {% endif %}
+        {# Results of the event this page belongs to. CURRENT event: red, pulsing "Live results". #}
+        {% if ev is defined and ev and ev.status in ('current', 'previous') %}
+          {% if ev.status == 'current' %}
+          <a class="nav-live" href="{{ url_for('event_results', event_id=ev.id) }}" {% if request.endpoint == 'event_results' %}aria-current="page"{% endif %}
+             aria-label="Live results of {{ ev.name }}"><span class="live-dot" aria-hidden="true"></span><span class="lbl-long">Live results</span><span class="lbl-short" aria-hidden="true">Live</span></a>
+          {% else %}
+          <a href="{{ url_for('event_results', event_id=ev.id) }}" {% if request.endpoint == 'event_results' %}aria-current="page"{% endif %}>{{ ui.icon('chart') }}<span>Results</span></a>
+          {% endif %}
+        {% endif %}
+        {% if is_admin %}
+          <a href="{{ url_for('admin') }}" data-tip="Dashboard" {% if request.endpoint == 'admin' %}aria-current="page"{% endif %}>{{ ui.icon('grid') }}<span>Dashboard</span></a>
+          <form method="post" action="{{ url_for('logout') }}" class="nav-form" data-confirm="Log out of the admin dashboard?" data-confirm-ok="Log out">
+            {{ ui.csrf() }}<button type="submit" class="nav-btn" data-tip="Log out">{{ ui.icon('logout') }}<span>Log out</span></button></form>
+        {% endif %}
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch light / dark mode" data-tip="Light / dark mode">{{ ui.icon('moon', 'i-moon') }}{{ ui.icon('sun', 'i-sun') }}</button>
+        {% if not is_admin and not is_student and request.endpoint != 'login' %}
+          {# Not logged in (create account / forgot Voter ID / verify pages): back to the login page. #}
+          <a class="nav-login" href="{{ url_for('login') }}">{{ ui.icon('lock') }}<span>Log in</span></a>
+        {% endif %}
+        {% if is_student %}
+          {# Student account menu (the drawer is just below the header). #}
+          <button type="button" class="menu-btn" id="account-menu-btn" aria-expanded="false" aria-controls="account-menu"
+                  aria-label="Account menu">
+            <span class="menu-avatar" aria-hidden="true">{{ session.get('name', '?')|initials }}</span><span class="menu-label">Menu</span>
+            <svg class="icon menu-caret" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  {% if is_student %}
+  {% set acct = request.endpoint or '' %}
+  <div class="modal drawer" id="account-menu" role="dialog" aria-modal="true" aria-labelledby="account-menu-name" hidden>
+    <nav class="drawer-panel" aria-label="Account">
+      <div class="drawer-head">
+        <span class="avatar tone-{{ session.get('name', '')|tone }}" aria-hidden="true">{{ session.get('name', '?')|initials }}</span>
+        <div class="drawer-who">
+          <p class="drawer-name" id="account-menu-name">{{ session.get('name') }}</p>
+          {% if session.get('group') %}<p class="drawer-group">{{ session.get('group') }}</p>{% endif %}
+          <p class="drawer-voter mono">{{ session.get('student_no') }}</p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-icon" data-close-modal aria-label="Close menu">{{ ui.icon('x') }}</button>
+      </div>
+      <ul class="drawer-links">
+        <li><a href="{{ url_for('my_account') }}" {% if acct == 'my_account' %}aria-current="page"{% endif %}>{{ ui.icon('grid') }}<span>My Account</span></a></li>
+        <li><a href="{{ url_for('account_profile') }}" {% if acct == 'account_profile' %}aria-current="page"{% endif %}>{{ ui.icon('users') }}<span>Voter Profile</span></a></li>
+        <li><a href="{{ url_for('account_history') }}" {% if acct == 'account_history' %}aria-current="page"{% endif %}>{{ ui.icon('clock') }}<span>Vote History</span></a></li>
+        <li><a href="{{ url_for('account_password') }}" {% if acct == 'account_password' %}aria-current="page"{% endif %}>{{ ui.icon('lock') }}<span>Change Password</span></a></li>
+        <li class="drawer-sep"><a href="{{ url_for('logout') }}" data-logout>{{ ui.icon('logout') }}<span>Log out</span></a></li>
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+
+  {# Flash messages appear as toasts. Pages can override this block to show them differently. #}
+  {% block flashes %}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  <div class="toasts" id="toasts" aria-live="polite">
+    {% for cat, msg in messages %}
+    <div class="toast toast-{{ cat }}" role="{{ 'alert' if cat in ('error', 'already') else 'status' }}">
+      {{ ui.icon('check' if cat == 'ok' else 'alert') }}
+      <span class="toast-msg">{{ msg }}</span>
+      <button type="button" class="btn btn-ghost btn-icon toast-close" aria-label="Dismiss">{{ ui.icon('x') }}</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endwith %}
+  {% endblock %}
+
+  <main id="main" class="page {% block main_class %}{% endblock %}" tabindex="-1">
+    {# Back + breadcrumbs ("Events > SSC Election 2026 > Ballot") on every page that has them #}
+    {% if crumbs is defined and crumbs %}{{ ui.crumbbar(crumbs, logout=(request.endpoint == 'index')) }}{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block footer %}
+  <footer class="footer">
+    <p><strong class="footer-brand">BotoKo</strong> &middot; Ang boto mo, boses mo.</p>
+    {# No "Live results" link on a results page itself (live or previous event): you're already there. #}
+    <p class="footer-links">{% if (session.get('student_id') or session.get('is_admin')) and request.endpoint not in ('event_results', 'results') %}<a href="{{ url_for('results') }}">Live results</a> &middot; {% endif %}<a href="{{ url_for('verify') }}">Verify a receipt</a></p>
+  </footer>
+  {% endblock %}
+
+  <script src="{{ asset('app.js') }}" defer></script>
+  <script src="{{ asset('rpc.js') }}" defer></script>
+  <script src="{{ asset('motion.js') }}" defer></script>
+  <script src="{{ asset('events.js') }}" defer></script>
+  <script src="{{ asset('fx.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ s.full_name }} · Students · BotoKo{% endblock %}
+{% block content %}
+{# Edit one student's details. The Voter ID and the voting status can't be changed here,
+   and the student's choices are never shown anywhere. #}
+{% set v = form or {'school_student_no': s.school_student_no or '', 'full_name': s.full_name, 'course': s.course or '',
+                    'department': s.department or '', 'year': s.year_level or '', 'section': s.section or ''} %}
+<div class="pagebar"><a class="btn btn-ghost back-btn" href="{{ url_for('admin') }}#students">{{ ui.icon('back') }}<span>Back to Students</span></a></div>
+<p class="eyebrow">COMELEC admin · Students</p>
+<h1>{{ s.full_name }}</h1>
+<dl class="facts">
+  <div><dt>Voter ID</dt><dd class="mono">{{ s.student_no }}</dd></div>
+  <div><dt>Voting status</dt><dd>{% if s.has_voted %}<span class="badge badge-ok">{{ ui.icon('check') }} Voted</span>{% else %}<span class="badge">Not yet voted</span>{% endif %}</dd></div>
+</dl>
+
+<section class="card">
+  <div class="card-head"><h2>{{ ui.icon('edit') }} Student details</h2></div>
+  {% if errors %}
+  <div class="alert alert-error" role="alert" id="edit-errors" style="margin-bottom:var(--s-4)">{{ ui.icon('alert') }}
+    <p><strong>Not saved:</strong>{{ errors|join('; ') }}.</p></div>
+  {% endif %}
+  <form method="post" class="stack" data-busy="Saving...">
+    {{ ui.csrf() }}
+    <div class="field"><label for="f-school">School student number</label>
+      <input id="f-school" name="school_student_no" value="{{ v.school_student_no }}" required
+             placeholder="e.g. {{ SCHOOL_NO_EXAMPLE }}" inputmode="numeric" autocomplete="off"></div>
+    <div class="field"><label for="f-name">Full name</label>
+      <input id="f-name" name="full_name" value="{{ v.full_name }}" required maxlength="80"></div>
+    <div class="row">
+      <div class="field grow"><label for="f-course">Course</label>
+        <input id="f-course" name="course" value="{{ v.course }}" required maxlength="30" placeholder="e.g. BSIT" autocapitalize="characters"></div>
+      <div class="field grow"><label for="f-dept">School/Department</label>
+        <input id="f-dept" name="department" value="{{ v.department }}" required maxlength="80"></div>
+    </div>
+    <div class="row">
+      <div class="field grow"><label for="f-year">Year</label>
+        <select id="f-year" name="year" required>
+          <option value="">Choose</option>
+          {% for y in range(1, MAX_YEAR + 1) %}<option value="{{ y }}" {% if v.year|string == y|string %}selected{% endif %}>{{ y }}</option>{% endfor %}
+        </select></div>
+      <div class="field grow"><label for="f-section">Section</label>
+        <input id="f-section" name="section" value="{{ v.section }}" required maxlength="10" placeholder="e.g. A" autocapitalize="characters"></div>
+    </div>
+    <button class="btn btn-primary" type="submit">Save details</button>
+  </form>
+</section>
+
+<section class="card">
+  <div class="card-head"><h2>{{ ui.icon('lock') }} Password</h2></div>
+  <p class="muted small">Passwords are never shown. If the student forgot theirs, make a new one. It is shown once, on a slip you can print.</p>
+  <form method="post" action="{{ url_for('admin_reset_password', student_id=s.id) }}" data-danger
+        data-confirm="Reset {{ s.full_name }}'s password?" data-confirm-text="Their current password will stop working immediately."
+        data-confirm-ok="Reset password">
+    {{ ui.csrf() }}
+    <button class="btn" type="submit">{{ ui.icon('refresh') }} Reset password</button>
+  </form>
+</section>
+{% endblock %}

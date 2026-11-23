@@ -1,0 +1,37 @@
+{# Students, PREVIOUS event with PUBLISHED results: "Winners" announcement at the top of the results page.
+   Big cards per position: photo, name, party, votes, Winner badge, a short celebration (CSS only,
+   none with reduced motion). The overview graph and "View more" follow below, unchanged. Needs: winners. #}
+{% import "_macros.html" as ui %}
+<section class="winners-announce" aria-labelledby="wn-title">
+  <div class="wn-head">
+    <p class="eyebrow">{{ ev.name }} · Official results</p>
+    <h1 id="wn-title">{{ ui.icon('crown') }} Congratulations to the winners!</h1>
+    {% if ev.published_txt %}<p class="muted small">Announced by the election committee · {{ ev.published_txt }}</p>{% endif %}
+  </div>
+  <div class="wn-grid">
+    {% for p in winners %}
+    {% for c in p.winners %}
+    <article class="wn-card" style="--i: {{ loop.index0 }}">
+      <span class="wn-confetti" aria-hidden="true"></span>
+      <p class="wn-pos">{{ p.name }}{% if p.seats > 1 %} <span class="muted">({{ p.seats }} seats)</span>{% endif %}</p>
+      <div class="wn-photo">{{ ui.avatar(c.name, c.party, 'xl', c.photo, 96) }}<span class="wn-crown" aria-hidden="true">{{ ui.icon('crown') }}</span></div>
+      <h2 class="wn-name">{{ c.name }}</h2>
+      {% if c.party %}<p class="wn-party">{{ c.party }}</p>{% endif %}
+      <p class="wn-votes tnum"><b data-countup>{{ c.votes }}</b> votes · {{ c.pct }}% of voters</p>
+      <span class="badge badge-lead wn-badge">{{ ui.icon('crown') }} Winner</span>
+    </article>
+    {% endfor %}
+    {% if p.tie %}
+    <article class="wn-card is-tie">
+      <p class="wn-pos">{{ p.name }}</p>
+      <h2 class="wn-name">Tie for last seat</h2>
+      <p class="wn-party">{{ p.tied|map(attribute='name')|join(', ') }} · {{ p.tied[0].votes }} votes each</p>
+      <span class="badge badge-warn">To be decided by the election committee</span>
+    </article>
+    {% endif %}
+    {% if not p.winners and not p.tie %}
+    <article class="wn-card is-empty"><p class="wn-pos">{{ p.name }}</p><p class="muted">No votes for this position.</p></article>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>

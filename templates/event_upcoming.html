@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ ev.name }} · Upcoming · BotoKo{% endblock %}
+{# UPCOMING event: ONLY what the voting is for and when it starts/ends (with a countdown).
+   No candidates, no other details, no voting yet. #}
+{% block content %}
+<section class="card upcoming-card">
+  {{ ui.status_badge(ev) }}
+  <h1>{{ ev.name }}</h1>
+  <h2 class="eyebrow">What this voting is for</h2>
+  <p class="upcoming-desc">{{ ev.description or 'COMELEC will share the details soon.' }}</p>
+
+  <dl class="event-dates big">
+    <div><dt>{{ ui.icon('clock') }} Voting starts</dt><dd>{{ ev.starts_txt or 'To be announced' }}</dd></div>
+    <div><dt>{{ ui.icon('lock') }} Voting ends</dt><dd>{{ ev.ends_txt or 'To be announced' }}</dd></div>
+  </dl>
+
+  {% if ev.starts_ms %}
+  <div class="countdown" data-countdown-to="{{ ev.starts_ms }}" aria-live="off">
+    <p class="eyebrow">Voting opens in</p>
+    <div class="countdown-units">
+      {% for unit in ['days', 'hours', 'minutes', 'seconds'] %}
+      <div class="cd-unit"><span class="cd-num tnum" data-cd="{{ unit }}">–</span><span class="cd-label">{{ unit }}</span></div>
+      {% endfor %}
+    </div>
+    <p class="hint" data-cd-done hidden>Voting is opening now… this page will refresh.</p>
+  </div>
+  {% endif %}
+
+  <p class="muted small">{{ ui.icon('info') }} Candidates and the ballot are shown when voting opens.</p>
+  <div class="actions-row">
+    {% if session.get('student_id') %}
+      {% if not state %}
+      <form method="post" action="{{ url_for('event_register', event_id=ev.id) }}" class="inline-form" data-busy="Registering...">
+        {{ ui.csrf() }}<button class="btn btn-primary" type="submit">{{ ui.icon('plus') }} Register for this event</button></form>
+      {% elif state.status == 'pending' %}
+      <span class="state-chip is-pending">{{ ui.icon('clock') }} Registration pending</span>
+      {% elif state.status == 'approved' %}
+      <span class="state-chip is-approved">{{ ui.icon('check') }} You're registered</span>
+      {% else %}
+      <span class="state-chip is-rejected">{{ ui.icon('alert') }} Registration rejected: {{ state.reason or 'no reason given' }}</span>
+      {% endif %}
+    {% endif %}
+    <a class="btn btn-ghost" href="{{ url_for('index') }}#upcoming">{{ ui.icon('back') }} All events</a>
+  </div>
+</section>
+{% endblock %}
